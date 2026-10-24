@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Thailand 2026</title>
+  <meta name="description" content="Familien-Reise-App Bangkok & Koh Samet">
+  <meta name="theme-color" content="#0a3f4c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Thailand">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <button class="back" id="backBtn" aria-label="Zurück" hidden>‹</button>
+    <h1 id="pageTitle">Thailand 2026</h1>
+    <span class="net" id="netState"></span>
+    <a class="sos" id="sosBtn" href="#/notfall" hidden aria-label="Notfall, Ärzte und Kliniken">SOS</a>
+  </header>
+  <main id="app" tabindex="-1"><p class="muted pad">Lädt …</p></main>
+  <nav class="tabbar" aria-label="Hauptnavigation">
+    <a href="#/heute" data-tab="heute"><span>☀️</span>Heute</a>
+    <a href="#/plan" data-tab="plan"><span>🗓️</span>Plan</a>
+    <a href="#/ausgaben" data-tab="ausgaben"><span>💶</span>Ausgaben</a>
+    <a href="#/liste" data-tab="liste"><span>✅</span>Liste</a>
+    <a href="#/tagebuch" data-tab="tagebuch" data-guestonly hidden><span>📸</span>Tagebuch</a>
+    <a href="#/mehr" data-tab="mehr"><span>☰</span>Mehr</a>
+  </nav>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="shared.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

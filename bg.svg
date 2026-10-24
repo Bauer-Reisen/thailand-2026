@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 2000" preserveAspectRatio="xMidYMid slice">
+  <!-- Abendstimmung über einer Bucht auf Koh Samet: Himmel, Sonne, Inseln, Longtail-Boot, Palme, Strand -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16425f"/>
+      <stop offset=".35" stop-color="#3f7c95"/>
+      <stop offset=".62" stop-color="#e98a62"/>
+      <stop offset=".8" stop-color="#ffc98a"/>
+      <stop offset="1" stop-color="#ffe2b0"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f1a77d"/>
+      <stop offset=".18" stop-color="#3b9aa3"/>
+      <stop offset=".6" stop-color="#16707e"/>
+      <stop offset="1" stop-color="#0b4552"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#fff3c4" stop-opacity=".95"/>
+      <stop offset=".35" stop-color="#ffd27a" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#ffb35c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sand" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6dcae"/>
+      <stop offset="1" stop-color="#e2b97c"/>
+    </linearGradient>
+  </defs>
+  <rect width="1000" height="1080" fill="url(#sky)"/>
+  <circle cx="640" cy="930" r="360" fill="url(#glow)"/>
+  <circle cx="640" cy="960" r="110" fill="#ffe7a6"/>
+  <!-- Inseln am Horizont -->
+  <path d="M0 1062 C70 1010 150 1000 230 1040 C280 1018 330 1022 380 1062 Z" fill="#5b4266" opacity=".75"/>
+  <path d="M700 1064 C760 1030 820 1012 880 1030 C930 1016 970 1024 1000 1040 L1000 1064 Z" fill="#5b4266" opacity=".6"/>
+  <rect y="1060" width="1000" height="940" fill="url(#sea)"/>
+  <!-- Sonnenspiegelung -->
+  <g fill="#ffe3a3" opacity=".7">
+    <rect x="590" y="1080" width="100" height="6" rx="3"/>
+    <rect x="565" y="1110" width="150" height="5" rx="2.5" opacity=".8"/>
+    <rect x="600" y="1140" width="80" height="5" rx="2.5" opacity=".7"/>
+    <rect x="550" y="1175" width="180" height="4" rx="2" opacity=".55"/>
+    <rect x="610" y="1215" width="60" height="4" rx="2" opacity=".5"/>
+    <rect x="575" y="1260" width="130" height="3" rx="1.5" opacity=".4"/>
+  </g>
+  <!-- Wellenlinien -->
+  <g fill="none" stroke="#bfeeea" stroke-opacity=".35" stroke-width="3" stroke-linecap="round">
+    <path d="M40 1380 q40 -14 80 0 t80 0"/>
+    <path d="M700 1460 q40 -14 80 0 t80 0 t80 0"/>
+    <path d="M260 1560 q40 -14 80 0 t80 0"/>
+    <path d="M540 1660 q40 -14 80 0 t80 0 t80 0"/>
+  </g>
+  <!-- Longtail-Boot -->
+  <g transform="translate(250 1290)" fill="#1d2b35">
+    <path d="M0 30 C60 46 210 46 270 22 L292 0 C250 14 120 20 20 12 Z"/>
+    <path d="M286 2 L300 -46 L306 -44 L294 4 Z"/>
+    <rect x="120" y="-6" width="70" height="18" rx="3" opacity=".85"/>
+    <path d="M-6 32 L-60 40" stroke="#1d2b35" stroke-width="4"/>
+  </g>
+  <!-- Strand -->
+  <path d="M0 1740 C220 1690 470 1720 700 1800 C820 1840 920 1880 1000 1900 L1000 2000 L0 2000 Z" fill="url(#sand)"/>
+  <path d="M0 1740 C220 1690 470 1720 700 1800 C820 1840 920 1880 1000 1900" fill="none" stroke="#ffffff" stroke-opacity=".55" stroke-width="6"/>
+  <!-- Palme -->
+  <g fill="#1a2730">
+    <path d="M118 1990 C122 1780 150 1560 232 1330 L246 1336 C170 1570 146 1790 146 1990 Z"/>
+    <path d="M238 1330 C160 1270 70 1270 0 1320 C80 1300 160 1306 236 1340 Z"/>
+    <path d="M238 1330 C190 1230 110 1180 20 1190 C110 1210 180 1260 232 1342 Z"/>
+    <path d="M238 1332 C270 1230 350 1180 440 1186 C360 1210 300 1260 246 1344 Z"/>
+    <path d="M240 1334 C320 1290 420 1300 490 1360 C410 1330 320 1324 246 1346 Z"/>
+    <path d="M238 1334 C232 1240 260 1170 320 1120 C280 1180 262 1250 248 1340 Z"/>
+    <path d="M236 1336 C180 1350 120 1400 90 1470 C140 1420 190 1380 242 1346 Z"/>
+    <circle cx="236" cy="1346" r="12"/><circle cx="252" cy="1354" r="10"/>
+  </g>
+</svg>

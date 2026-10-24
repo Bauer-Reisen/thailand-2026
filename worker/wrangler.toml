@@ -1,0 +1,7 @@
+name = "thailand-claude-proxy"
+main = "claude-proxy.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Adresse eurer GitHub-Pages-Seite, ohne Pfad und ohne Schrägstrich am Ende
+ALLOWED_ORIGIN = "https://DEINNAME.github.io"
