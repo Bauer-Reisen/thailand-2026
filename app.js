@@ -123,7 +123,7 @@ function recommendedType(date) {
   const day = calendarDay(date);
   const w = weatherFor(day?.place, date);
   if (!w) return null;
-  if (w.code >= 95 || (w.code >= 61 && w.code <= 82 && w.prob >= 50) || w.prob >= 70 || w.rain >= 8) return 'regen';
+  if (w.rainH != null ? (w.rainH >= 4 || w.rain >= 12) : (w.code >= 95 || (w.code >= 61 && w.code <= 82 && w.prob >= 50) || w.prob >= 70 || w.rain >= 8)) return 'regen';
   if (w.tmax >= 35) return 'hitze';
   return null;
 }
@@ -144,7 +144,7 @@ function alertCard(fromDate) {
   const swap = sunnySwapSuggestion();
   return `<div class="card warnbox"><div class="row between"><b>⚠️ Wetter-Hinweis${list.length > 1 ? ` für ${list.length} Tage` : ''}</b>${fresh.length ? `<button class="btn small ghost" id="wxSeen">Gesehen</button>` : ''}</div>
     ${list.map(x => `<a class="warnrow" href="#/plan/${x.date}"><span class="d">${dayLabel(x.date)}${seen[x.date] !== x.type ? ' <span class="badge open">neu</span>' : ''}</span>
-      <span class="grow"><b>${wmo(x.w.code).icon} ${x.type === 'hitze' ? `${Math.round(x.w.tmax)}° Hitze` : `${wmo(x.w.code).text}, Regen ${x.w.prob} %`}</b> · ${esc(x.src.title)}
+      <span class="grow"><b>${wxLook(x.w).icon} ${x.type === 'hitze' ? `${Math.round(x.w.tmax)}° Hitze` : x.w.rainH != null ? `${wxLook(x.w).text}, ca. ${x.w.rainH} Std. Regen tagsüber` : `${wxLook(x.w).text}, Regen ${x.w.prob} %`}</b> · ${esc(x.src.title)}
       <span class="small muted" style="display:block">${x.plan.opt.key === 'A' ? 'Plan A geplant – Plan B ansehen' : `${esc(x.plan.opt.label)} ${x.plan.auto ? 'automatisch gewählt' : 'gewählt'}`}${x.ahead > 7 ? ' · Vorhersage noch unsicher' : ''}</span></span></a>`).join('')}
     ${swap ? `<div class="btns"><button class="btn small" data-wxswap="${swap.from}|${swap.to}">☀️ ${esc(swap.title)} auf ${dayLabel(swap.to)} legen</button></div>` : ''}</div>`;
 }
@@ -200,32 +200,57 @@ function weatherFor(placeId, date) {
   const i = c.daily.time.indexOf(date);
   if (i < 0) return null;
   const d = c.daily;
-  return {
+  const w = {
     code: d.weather_code[i], tmax: d.temperature_2m_max[i], tmin: d.temperature_2m_min[i],
     prob: d.precipitation_probability_max[i] ?? 0, rain: d.precipitation_sum[i] ?? 0,
-    uv: d.uv_index_max?.[i], sunset: d.sunset?.[i]?.slice(11, 16), ts: c.ts
+    uv: d.uv_index_max?.[i], sunset: d.sunset?.[i]?.slice(11, 16), ts: c.ts, rainH: null
   };
+  // Der Tagescode von Open-Meteo ist der schlimmste Moment des Tages – ein kurzes Tropengewitter macht sonst den ganzen Tag „⛈️“.
+  // Darum zählt hier nur der Tag von 8 bis 20 Uhr, Stunde für Stunde.
+  const h = c.hourly;
+  if (h) {
+    const idx = h.time.map((t, k) => [t, k]).filter(([t]) => t.startsWith(date) && +t.slice(11, 13) >= 8 && +t.slice(11, 13) < 20).map(([, k]) => k);
+    if (idx.length) {
+      const wet = idx.filter(k => (h.precipitation[k] ?? 0) >= 0.5 && (h.precipitation_probability[k] ?? 0) >= 40);
+      const dry = idx.filter(k => !wet.includes(k)).map(k => Math.min(h.weather_code[k], 3));
+      w.rainH = wet.length;
+      w.rain = idx.reduce((a, k) => a + (h.precipitation[k] ?? 0), 0);
+      w.prob = Math.max(...idx.map(k => h.precipitation_probability[k] ?? 0));
+      w.storm = wet.some(k => h.weather_code[k] >= 95);
+      w.showerAt = wet.length ? `${h.time[wet[0]].slice(11, 13)}–${+h.time[wet[wet.length - 1]].slice(11, 13) + 1} Uhr` : '';
+      w.code = wet.length >= 4 ? Math.max(...wet.map(k => h.weather_code[k])) : dry.sort((a, b) => a - b)[Math.floor(dry.length / 2)] ?? 2;
+    }
+  }
+  return w;
+}
+// Symbol und Text für den Tag: kurze Schauer werden als solche benannt, nicht als Regentag
+function wxLook(w) {
+  if (w.rainH == null || w.rainH >= 4) return wmo(w.code);
+  if (!w.rainH) return wmo(w.code);
+  const base = wmo(w.code);
+  return { icon: w.storm ? '⛈️' : '🌦️', text: `${base.text}, kurz ${w.storm ? 'Gewitter' : 'Schauer'} (${w.showerAt})` };
 }
 function sunScore(w) {
   if (!w) return -999;
-  return 100 - w.prob - w.rain * 4 - (w.code >= 95 ? 30 : 0) + (w.code <= 2 ? 15 : 0);
+  return w.rainH != null ? 100 - w.rainH * 12 - w.rain * 2 + (w.code <= 2 ? 15 : 0) : 100 - w.prob - w.rain * 4 - (w.code >= 95 ? 30 : 0) + (w.code <= 2 ? 15 : 0);
 }
 async function loadWeather(force = false) {
   const cache = store.get('wx', {});
   const ids = ['bkk', 'samet'];
-  const stale = ids.some(id => !cache[id] || Date.now() - cache[id].ts > 3 * 3600000);
+  const stale = ids.some(id => !cache[id] || !cache[id].hourly || Date.now() - cache[id].ts > 3 * 3600000);
   if (!navigator.onLine || (!stale && !force)) return false;
   let changed = false;
   await Promise.all(ids.map(async id => {
     const p = trip.places[id];
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}` +
       '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max,sunset' +
+      '&hourly=weather_code,precipitation,precipitation_probability' +
       `&timezone=${encodeURIComponent(p.tz)}&forecast_days=16`;
     try {
       const r = await fetch(url);
       if (!r.ok) throw new Error(r.status);
       const j = await r.json();
-      cache[id] = { ts: Date.now(), daily: j.daily };
+      cache[id] = { ts: Date.now(), daily: j.daily, hourly: j.hourly };
       changed = true;
     } catch (e) { console.warn('Wetter', id, e); }
   }));
@@ -240,10 +265,10 @@ function wxStamp(ts) {
 function wxBox(placeId, date, label) {
   const w = weatherFor(placeId, date);
   if (!w) return `<div><div class="small muted">${esc(label)}</div><div>Noch keine Vorhersage</div></div>`;
-  const m = wmo(w.code);
+  const m = wxLook(w);
   return `<div><div class="small muted">${esc(label)} · ${esc(trip.places[placeId].name)}</div>
     <div class="row"><span class="ico">${m.icon}</span><b class="big">${Math.round(w.tmax)}°</b></div>
-    <div class="small">${esc(m.text)} · Regen ${w.prob}%${w.rain ? ` (${num(w.rain, 1)} mm)` : ''}</div>
+    <div class="small">${esc(m.text)}${w.rainH == null ? ` · Regen ${w.prob}%` : w.rainH ? '' : ' · trocken'}${w.rain >= 1 ? ` · ${num(w.rain, 1)} mm` : ''}</div>
     <div class="small muted">${w.uv != null ? `UV ${Math.round(w.uv)} · ` : ''}${w.sunset ? `Sonnenuntergang ${w.sunset}` : ''}</div></div>`;
 }
 
@@ -347,6 +372,11 @@ function route() {
   $('.tabbar').hidden = false;
   $('.tabbar').style.gridTemplateColumns = `repeat(${tabs.filter(a => !a.hidden).length}, 1fr)`;
   $('#pageTitle').textContent = r.title;
+  // alle Seiten außer „Heute“: großer Titel auf dem Urlaubsbild, Inhalt auf dem Sandbogen darunter
+  const paper = r !== ROUTES.heute;
+  document.body.classList.toggle('paper', paper); document.body.classList.remove('login');
+  $('#pageHero').hidden = !paper;
+  $('#pageHero').textContent = paper ? r.title : '';
   $('#backBtn').hidden = !r.back;
   $('#sosBtn').hidden = isGuest() || name === 'notfall';
   $$('.tabbar a').forEach(a => a.classList.toggle('active', a.dataset.tab === r.tab));
@@ -448,14 +478,28 @@ async function loadCommons(q) {
 
 function itemsHtml(items, opts = {}) {
   if (!items?.length) return '<p class="muted">Keine Punkte.</p>';
-  return `<ul class="items">${items.map((it, i) => `
-    <li class="${opts.highlight === i ? 'now' : ''}">
-      <div class="t">${esc(it.time || '–')}</div>
-      <div class="grow"><div><b>${esc(it.title)}</b>${checkBadge(it)}</div>
-        ${it.place ? `<div class="small muted">${esc(it.place)}</div>` : ''}
-        ${it.note ? `<div class="small">${esc(it.note)}</div>` : ''}${glossHtml(`${it.title} ${it.place || ''}`)}${picsBtn(it)}</div>
-      ${it.maps ? `<a class="maps small" href="${mapsUrl(it.maps)}" target="_blank" rel="noopener">Karte & Fotos ↗</a>` : ''}
-    </li>`).join('')}</ul>`;
+  return `<ol class="timeline">${items.map((it, i) => `
+    <li class="${opts.highlight === i ? 'now' : opts.highlight != null && i < opts.highlight ? 'past' : ''}">
+      <div class="t">${esc(it.time || '–')}</div><div class="dot" aria-hidden="true"></div>
+      <div class="grow"><div class="tt">${esc(it.title)}${checkBadge(it)}</div>
+        ${it.place && it.place !== it.title ? `<div class="small muted">${esc(it.place)}</div>` : ''}
+        ${it.note ? `<div class="small note">${esc(it.note)}</div>` : ''}
+        <div class="acts">${it.maps ? `<a class="pill" href="${mapsUrl(it.maps)}" target="_blank" rel="noopener">📍 Karte</a>` : ''}${picsBtn(it)}</div></div>
+    </li>`).join('')}</ol>`;
+}
+/* Wetter-Leiste: die nächsten Tage auf einen Blick, schlechte Tage rot */
+function wxStrip(fromDate, n = 8) {
+  const days = trip.days.filter(d => d.date >= fromDate && d.place !== 'fra').slice(0, n);
+  const cells = days.map(d => {
+    const w = weatherFor(d.place, d.date);
+    const rec = recommendedType(d.date);
+    const dt = new Date(d.date + 'T12:00:00Z');
+    return `<a href="#/plan/${d.date}" class="${d.date === fromDate ? 'today' : ''} ${rec ? 'bad' : ''}">
+      <span class="wd">${d.date === fromDate ? 'Heute' : dt.toLocaleDateString('de-DE', { weekday: 'short', timeZone: 'UTC' })}</span>
+      <span class="wi">${w ? wxLook(w).icon : '·'}</span><b>${w ? Math.round(w.tmax) + '°' : '–'}</b>
+      <span class="wr">${w ? (w.rainH != null ? (w.rainH ? w.rainH + ' Std.' : 'trocken') : w.prob + ' %') : ''}</span></a>`;
+  }).join('');
+  return `<div class="days7" role="list">${cells}</div>`;
 }
 /* Termine, die nicht verpasst werden dürfen (z. B. digitale Einreisekarte) */
 function reminderCards(onlyRelevant) {
@@ -519,14 +563,14 @@ function renderToday(main) {
   if (t.date < start) {
     const days = Math.round((new Date(start + 'T12:00:00Z') - new Date(t.date + 'T12:00:00Z')) / 86400000);
     const bk = partsIn(now(), BANGKOK);
-    html += `<div class="next-hero"><div class="label">${esc(trip.meta.subtitle)}</div>
-      <div class="huge">Noch ${days} ${days === 1 ? 'Tag' : 'Tage'}</div>
-      <div>Abflug ${esc(trip.flights[0].depDisplay)} · ${esc(trip.flights[0].number)}</div>
-      <div class="small" style="margin-top:6px;opacity:.9">🕐 In Bangkok ist es jetzt ${fmtMin(bk.min)} Uhr${bk.date !== t.date ? ` (${dayLabel(bk.date)})` : ''}</div></div>`;
+    html += `<header class="hero2"><div class="eyebrow">${esc(trip.meta.subtitle)}</div>
+      <h1 class="count"><span>${days}</span> ${days === 1 ? 'Tag' : 'Tage'} bis Thailand</h1>
+      <div class="pills"><span class="glass">✈️ ${esc(trip.flights[0].depDisplay)} · ${esc(trip.flights[0].number)}</span>
+      <span class="glass">🇹🇭 ${fmtMin(bk.min)} Uhr${bk.date !== t.date ? ` (${dayLabel(bk.date)})` : ''}</span></div></header><div class="sheetpage">`;
     if (!isGuest()) html += reminderCards(false) + checkinCards(false);
     if (!isGuest()) html += quickRow([['ics', '📅', 'Kalender'], ['#/abgleich', '⬇︎', 'Offline'], ['#/liste', '✅', 'Packliste'], ['#/fluege', '✈️', 'Flüge'], ['#/lernen', '📚', 'Lernen'], ['#/kinder', '🧸', 'Kinder']])
       + alertCard(start) + openPointsCard();
-    html += `<h2>Erste Reisetage</h2><div class="card"><div class="wx">${wxBox('bkk', addDays(start, 1), dayLabel(addDays(start, 1)))}${wxBox('samet', addDays(start, 2), dayLabel(addDays(start, 2)))}</div>${wxFoot()}</div>`;
+    html += `<h2>Wetter in Thailand</h2>${wxStrip(start)}<div class="pad small wxnote">${wxFoot()}</div></div>`;
     main.innerHTML = html;
     return;
   }
@@ -546,20 +590,25 @@ function renderToday(main) {
   if (idx < 0 && items.every(it => toMin(it.time) == null)) idx = 0;
   const next = items[idx];
 
-  const other = t.tz === BANGKOK ? ['Deutschland', partsIn(now(), BERLIN)] : ['Bangkok', partsIn(now(), BANGKOK)];
-  html += `<div class="headline"><div class="small muted">${dayLabel(t.date, true)} · ${esc(trip.places[day.place].name)} · ${fmtMin(nowMin)} Uhr · 🕐 ${other[0]} ${fmtMin(other[1].min)}${other[1].date !== t.date ? ` (${dayLabel(other[1].date)})` : ''}</div>
-    <div class="big">${esc(sourceDay(t.date).title)}</div></div>`;
+  const other = t.tz === BANGKOK ? ['🇩🇪', partsIn(now(), BERLIN)] : ['🇹🇭', partsIn(now(), BANGKOK)];
+  const wplace = day.place === 'fra' ? 'bkk' : day.place, w = weatherFor(wplace, t.date), look = w && wxLook(w);
+  const dt = new Date(t.date + 'T12:00:00Z');
+  html += `<header class="hero2">
+    <div class="eyebrow">${dt.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })} · ${esc(trip.places[day.place].name)}</div>
+    <h1>${esc(sourceDay(t.date).title)}</h1>
+    <div class="pills">${w ? `<span class="glass">${look.icon} <b>${Math.round(w.tmax)}°</b> ${esc(look.text)}</span>` : ''}
+      <span class="glass">🕐 ${fmtMin(nowMin)} · ${other[0]} ${fmtMin(other[1].min)}</span>${w?.sunset ? `<span class="glass">🌅 ${w.sunset}</span>` : ''}</div></header>`;
+  html += '<div class="sheetpage">';
   if (!isGuest()) html += reminderCards(true) + checkinCards(true);
 
   if (next) {
-    html += `<div class="next-hero"><div class="label">Als Nächstes</div>
-      <div class="huge">${esc(next.time || 'heute')}</div>
-      <div class="big" style="margin-top:4px">${esc(next.title)}${checkBadge(next)}</div>
-      ${next.place ? `<div>${esc(next.place)}</div>` : ''}${next.note ? `<div class="small">${esc(next.note)}</div>` : ''}
-      ${next.maps ? `<div class="btns"><a class="btn block" href="${mapsUrl(next.maps)}" target="_blank" rel="noopener">📍 In Google Maps öffnen</a></div>` : ''}</div>`;
+    html += `<section class="nowcard"><div class="row between"><span class="eyebrow">Als Nächstes</span>${next.maps ? `<a class="round" href="${mapsUrl(next.maps)}" target="_blank" rel="noopener" aria-label="In Google Maps öffnen">📍</a>` : ''}</div>
+      <div class="time">${esc(next.time || 'heute')}</div>
+      <div class="what">${esc(next.title)}${checkBadge(next)}</div>
+      ${next.note ? `<div class="small">${esc(next.note)}</div>` : ''}</section>`;
   } else {
     const tFirst = tomorrow && activePlan(tomorrow.date).opt?.plan.items[0];
-    html += `<div class="next-hero"><div class="label">Heute</div><div class="big">Alles erledigt – Feierabend 🌅</div>${tFirst ? `<div class="small">Morgen: ${esc(tFirst.time)} ${esc(tFirst.title)}</div>` : ''}</div>`;
+    html += `<section class="nowcard calm"><span class="eyebrow">Heute</span><div class="what">Alles erledigt – Feierabend 🌅</div>${tFirst ? `<div class="small">Morgen: ${esc(tFirst.time)} ${esc(tFirst.title)}</div>` : ''}</section>`;
   }
 
   const rec = recommendedType(t.date);
@@ -569,16 +618,16 @@ function renderToday(main) {
 
   const sp = isGuest() ? 0 : spentOn(t.date);
   html += isGuest() ? quickRow([['#/tagebuch', '📸', 'Tagebuch'], ['#/plan', '🗓️', 'Alle Tage'], ['#/woerter', '🗣️', 'Thai']])
-    : quickRow([['#/ausgaben', '💶', eur(sp)], ['#/essen', '🍜', 'Essen'], ['#/lernen', '📚', 'Lernen'], ['#/kinder', '🧸', 'Kinder'], ['#/tagebuch', '📸', 'Tagebuch'], ['#/woerter', '🗣️', 'Thai']]);
+    : quickRow([['#/ausgaben', '💶', eur(sp)], ['#/essen', '🍜', 'Essen'], ['#/woerter', '🗣️', 'Thai'], ['#/lernen', '📚', 'Lernen'], ['#/kinder', '🧸', 'Kinder'], ['#/tagebuch', '📸', 'Tagebuch']]);
   if (!isGuest()) html += alertCard(t.date);
-  html += `<div class="card"><div class="wx">${wxBox(day.place === 'fra' ? 'bkk' : day.place, t.date, 'Heute')}${tomorrow ? wxBox(tomorrow.place === 'fra' ? 'bkk' : tomorrow.place, tomorrow.date, 'Morgen') : ''}</div>${wxFoot()}</div>`;
+  html += `<h2>Die nächsten Tage</h2>${wxStrip(t.date)}<div class="pad small wxnote">${wxFoot()}</div>`;
   html += `<h2>Heute · ${esc(opt?.label || '')}</h2><div class="card">${itemsHtml(items, { highlight: idx })}
-    ${isGuest() ? '' : `<div class="btns"><a class="btn ghost small" href="#/plan/${t.date}">Plan ändern / neu generieren</a></div>`}</div>`;
+    ${isGuest() ? '' : `<div class="btns"><a class="btn ghost small" href="#/plan/${t.date}">Plan ändern / neu generieren</a></div>`}</div></div>`;
   main.innerHTML = html;
 }
 function wxFoot() {
   const ts = Math.max(...Object.values(store.get('wx', {})).map(c => c.ts), 0);
-  return `<div class="row between small muted" style="margin-top:8px"><span>${ts ? wxStamp(ts) + (navigator.onLine ? '' : ' (offline)') : 'Noch nicht geladen'} · Open-Meteo</span>
+  return `<div class="row between small muted" style="margin-top:8px"><span>${ts ? wxStamp(ts) + (navigator.onLine ? '' : ' (offline)') : 'Noch nicht geladen'} · Open-Meteo · <a href="https://www.google.com/search?q=wetteronline+${encodeURIComponent(calendarDay(today().date)?.place === 'samet' ? 'Koh Samet' : 'Bangkok')}" target="_blank" rel="noopener">WetterOnline</a></span>
     <button class="btn small ghost" id="wxReload">Aktualisieren</button></div>`;
 }
 document.addEventListener('click', async e => {
@@ -638,7 +687,7 @@ function dayHtml(date, open) {
   const { opt, opts, auto } = activePlan(date);
   const rec = recommendedType(date);
   const w = weatherFor(cal.place, date);
-  const m = w && wmo(w.code);
+  const m = w && wxLook(w);
   const isToday = date === today().date;
   const swapTargets = cal.swap && !isGuest() ? trip.days.filter(d => d.swap && d.date !== date) : [];
   return `<details class="day ${isToday ? 'today-mark' : ''}" data-date="${date}" ${open ? 'open' : ''}>
@@ -751,7 +800,7 @@ async function generateWithClaude(date) {
   const { opt } = activePlan(date);
   const prefs = trip.preferences;
   const ideas = (trip.ideas[cal.place] || []).map(i => i.title).join('; ');
-  const wxText = w ? `${wmo(w.code).text}, max ${Math.round(w.tmax)} °C, Regenwahrscheinlichkeit ${w.prob} %, ${num(w.rain, 1)} mm${w.sunset ? `, Sonnenuntergang ${w.sunset}` : ''}` : 'keine Vorhersage verfügbar';
+  const wxText = w ? `${wxLook(w).text}, max ${Math.round(w.tmax)} °C, Regenwahrscheinlichkeit ${w.prob} %, ${num(w.rain, 1)} mm${w.sunset ? `, Sonnenuntergang ${w.sunset}` : ''}` : 'keine Vorhersage verfügbar';
   const prompt = `Wir sind eine Familie (2 Erwachsene, Kinder ${prefs.kids.join(' und ')} Jahre) im Urlaub.
 Ort: ${place.name}, Thailand. Datum: ${dayLabel(date, true)}${date === t.date ? `, jetzt ist es ${fmtMin(t.min)} Uhr – plane nur ab jetzt` : ''}.
 Wetter: ${wxText}.
@@ -871,7 +920,7 @@ function renderIdeas(main, placeArg) {
       <input type="checkbox" data-key="idea:${i.id}" ${isChecked(`idea:${i.id}`) ? 'checked' : ''} aria-label="${esc(i.title)}">
       <div class="grow"><div class="lbl"><b>${esc(i.title)}</b>${checkBadge(i)}</div>
         <div class="small muted">${wxIcon[i.weather] || ''} · ca. ${String(i.hours).replace('.', ',')} h · ${cost[i.cost]}${i.kids ? '' : ' · eher für Eltern'}</div>
-        ${i.note ? `<div class="small">${esc(i.note)}</div>` : ''}${glossHtml(i.title)}
+        ${i.note ? `<div class="small">${esc(i.note)}</div>` : ''}
         ${picsBtn(i)}
         <div class="row small" style="margin-top:4px">${i.maps ? `<a href="${mapsUrl(i.maps)}" target="_blank" rel="noopener" class="maps">Karte & Fotos ↗</a>` : ''}
           <select data-add="${i.id}" style="width:auto;min-height:36px;padding:4px;font-size:.85rem"><option value="">＋ zu Tag …</option>${days.map(d => `<option value="${d.date}">${dayLabel(d.date)}</option>`).join('')}</select></div>
@@ -2464,6 +2513,7 @@ function logout() {
 }
 function renderLogin() {
   $('#pageTitle').textContent = 'Thailand 2026';
+  document.body.classList.remove('paper'); document.body.classList.add('login'); $('#pageHero').hidden = true;
   $('#sosBtn').hidden = true;
   $('#backBtn').hidden = true;
   $('.tabbar').hidden = true;

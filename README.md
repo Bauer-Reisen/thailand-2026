@@ -52,7 +52,10 @@ Lernen → 🗺️ Länder-Atlas: Europa- und Thailand-Karte, Steckbriefe für D
 Mehr → Für die Kinder: Pilotenspiel mit Weltkarte (10 Flüge: Land und Stadt finden, dann fliegen), Flug-Fortschritt (während des Flugs), drei Gute-Nacht-Geschichten mit Vorlesen, Thailand-Quiz, Memory, Spiele ohne Material. Alles offline.
 
 ## Design
-Urlaubsbild `bg.svg` als Hintergrund, eigenes Foto unter Abgleich & Offline → Hintergrundbild. Schrift: Prompt (Google Fonts, von einem thailändischen Schriftbüro), wird offline gespeichert.
+Oben das Urlaubsbild (`bg.svg`, eigenes Foto unter Abgleich & Offline → Hintergrundbild) mit großer Überschrift, darunter ein durchgehender sandfarbener Bogen statt einzelner Kacheln. Im Dunkelmodus des Handys automatisch „Bangkok bei Nacht“ (dunkel, Leuchtfarben). Schrift: Prompt (Google Fonts, von einem thailändischen Schriftbüro), wird offline gespeichert.
+
+## Wetter
+Open-Meteo, bis 16 Tage, verlässlich etwa eine Woche. Ausgewertet wird stündlich von 8 bis 20 Uhr: ein kurzes Gewitter am Nachmittag erscheint als „kurz Gewitter (15–16 Uhr)“, nicht als Regentag. Rot gewarnt wird ab etwa 4 Regenstunden tagsüber oder 12 mm.
 
 ## Bilder & Thai-Wörter
 „📷 Bilder“ zeigt bis zu 6 freie Fotos von Wikimedia Commons, die Kurzinfo aus Wikipedia (Feld `wiki` in den Ideen) und einen Link zur Google-Bildersuche. „Karte & Fotos“ öffnet den Ort in Google Maps mit den Fotos dort. Einmal angesehene Bilder bleiben offline verfügbar. Mehr → Thai-Sprachführer: rund 50 Sätze nach Situationen (Restaurant, Kinderessen, Unterwegs, Unterkunft, Notfall), Zahlen, Tischreservierung als fertiger Thai/Englisch-Text; Antippen zeigt den Satz groß zum Vorzeigen.
