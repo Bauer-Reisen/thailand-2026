@@ -474,3 +474,13 @@ body.login .topbar #pageTitle { visibility: visible; }
 :is(.sheetpage, body.paper main) details.day[open] { background: var(--raised); border-radius: 18px; border-top-color: transparent; margin: 8px 10px; }
 :is(.sheetpage, body.paper main) details.day.today-mark > summary { box-shadow: inset 4px 0 0 var(--hot); border-radius: 14px; }
 :is(.sheetpage, body.paper main) .today-mark { outline: 0; }
+/* Wetter ruhig statt rot – Rot nur für wirklich Offenes (offene Punkte) */
+.warnbox, :is(.sheetpage, body.paper main) .warnbox { border: 0; border-left: 5px solid var(--brand); background: var(--raised); }
+.warnrow .d { color: var(--brand); }
+.days7 a.bad { background: none; }
+.days7 a.bad :is(.wr, .wd) { color: inherit; font-weight: inherit; }
+.days7 a.bad .wd { color: var(--sand-muted); }
+.badge.wx { background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--brand); }
+.card.wxtip, :is(.sheetpage, body.paper main) .card.wxtip { margin: 14px 16px; padding: 12px 16px; border-radius: 18px; border: 0; background: color-mix(in srgb, var(--brand) 10%, var(--raised)); color: inherit; }
+.card.openred, :is(.sheetpage, body.paper main) .card.openred { margin: 14px 16px; padding: 14px 16px; border-radius: 18px; border: 0; border-left: 5px solid #e63946; background: var(--bad-bg); color: var(--text); }
+.card.openred b { color: var(--bad-ink); }

@@ -142,8 +142,8 @@ function alertCard(fromDate) {
   const seen = store.get('wxAlertSeen', {});
   const fresh = list.filter(x => seen[x.date] !== x.type);
   const swap = sunnySwapSuggestion();
-  return `<div class="card warnbox"><div class="row between"><b>⚠️ Wetter-Hinweis${list.length > 1 ? ` für ${list.length} Tage` : ''}</b>${fresh.length ? `<button class="btn small ghost" id="wxSeen">Gesehen</button>` : ''}</div>
-    ${list.map(x => `<a class="warnrow" href="#/plan/${x.date}"><span class="d">${dayLabel(x.date)}${seen[x.date] !== x.type ? ' <span class="badge open">neu</span>' : ''}</span>
+  return `<div class="card warnbox"><div class="row between"><b>☂️ Wetter-Tipp${list.length > 1 ? ` für ${list.length} Tage` : ''}</b>${fresh.length ? `<button class="btn small ghost" id="wxSeen">Gesehen</button>` : ''}</div>
+    ${list.map(x => `<a class="warnrow" href="#/plan/${x.date}"><span class="d">${dayLabel(x.date)}${seen[x.date] !== x.type ? ' <span class="badge">neu</span>' : ''}</span>
       <span class="grow"><b>${wxLook(x.w).icon} ${x.type === 'hitze' ? `${Math.round(x.w.tmax)}° Hitze` : x.w.rainH != null ? `${wxLook(x.w).text}, ca. ${x.w.rainH} Std. Regen tagsüber` : `${wxLook(x.w).text}, Regen ${x.w.prob} %`}</b> · ${esc(x.src.title)}
       <span class="small muted" style="display:block">${x.plan.opt.key === 'A' ? 'Plan A geplant – Plan B ansehen' : `${esc(x.plan.opt.label)} ${x.plan.auto ? 'automatisch gewählt' : 'gewählt'}`}${x.ahead > 7 ? ' · Vorhersage noch unsicher' : ''}</span></span></a>`).join('')}
     ${swap ? `<div class="btns"><button class="btn small" data-wxswap="${swap.from}|${swap.to}">☀️ ${esc(swap.title)} auf ${dayLabel(swap.to)} legen</button></div>` : ''}</div>`;
@@ -612,9 +612,9 @@ function renderToday(main) {
   }
 
   const rec = recommendedType(t.date);
-  if (auto) html += `<div class="card alert"><b>Wetter: ${PLAN_TYPES[rec]}</b> – automatisch ${esc(opt.label)} gewählt. <a href="#/plan/${t.date}">Ändern</a></div>`;
+  if (auto) html += `<div class="card wxtip"><b>☂️ ${PLAN_TYPES[rec]}</b> – automatisch ${esc(opt.label)} gewählt. <a href="#/plan/${t.date}">Ändern</a></div>`;
   else if (rec && opt.key === 'A' && planOptions(t.date).some(o => o.type === rec))
-    html += `<div class="card alert"><b>Wetter: ${PLAN_TYPES[rec]}</b> – es gibt einen passenden Plan B. <a href="#/plan/${t.date}">Ansehen</a></div>`;
+    html += `<div class="card wxtip"><b>☂️ ${PLAN_TYPES[rec]}</b> – es gibt einen passenden Plan B. <a href="#/plan/${t.date}">Ansehen</a></div>`;
 
   const sp = isGuest() ? 0 : spentOn(t.date);
   html += isGuest() ? quickRow([['#/tagebuch', '📸', 'Tagebuch'], ['#/plan', '🗓️', 'Alle Tage'], ['#/woerter', '🗣️', 'Thai']])
@@ -644,7 +644,7 @@ function openPointsCard() {
     ...trip.transfers.filter(x => x.check && /offen/.test(`${x.dep} ${x.cost}`)).map(x => `${dayLabel(x.date)}: ${x.from} → ${x.to}`)
   ];
   if (!open.length) return '';
-  return `<div class="card open"><b>Offene Punkte</b><ul style="margin:6px 0 0;padding-left:20px">${open.map(o => `<li>${esc(o)}</li>`).join('')}</ul></div>`;
+  return `<div class="card open openred"><b>⚠️ Offene Punkte</b><ul style="margin:6px 0 0;padding-left:20px">${open.map(o => `<li>${esc(o)}</li>`).join('')}</ul></div>`;
 }
 function budgetMeter(spent, b) {
   const pct = Math.min(100, (spent / b) * 100);
@@ -659,7 +659,7 @@ function renderPlan(main, openDate) {
   let html = `<div class="card small">Jeder Tag hat Plan A und Plan B. Bei schlechtem Wetter wird Plan B automatisch vorgeschlagen. ${wxStampShort()}</div>`;
   const sunny = false;
   if (!isGuest()) html += alertCard(t.date < trip.meta.start ? trip.meta.start : t.date);
-  if (sunny) html += `<div class="card alert"><b>☀️ ${esc(sunny.title)}</b> liegt auf ${dayLabel(sunny.from)}, sonnigster Tag laut Vorhersage: ${dayLabel(sunny.to)}
+  if (sunny) html += `<div class="card wxtip"><b>☀️ ${esc(sunny.title)}</b> liegt auf ${dayLabel(sunny.from)}, sonnigster Tag laut Vorhersage: ${dayLabel(sunny.to)}
       <div class="btns"><button class="btn" data-sunswap="${sunny.from}|${sunny.to}">Auf ${dayLabel(sunny.to)} legen</button></div></div>`;
   html += trip.days.map(d => dayHtml(d.date, d.date === (openDate || t.date))).join('');
   main.innerHTML = html;
@@ -694,9 +694,9 @@ function dayHtml(date, open) {
     <summary><div class="datepill">${dayLabel(date).replace(' ', '<br>')}</div>
       <div class="grow"><b>${esc(src.title)}</b>${src.date !== date ? ' <span class="badge">getauscht</span>' : ''}
         <div class="small muted">${esc(trip.places[cal.place].name)} · ${esc(opt?.label || '')}</div></div>
-      ${m ? `<div style="text-align:right"><div style="font-size:1.4rem">${m.icon}</div><div class="small">${Math.round(w.tmax)}° · ${w.prob}%</div>${rec ? `<span class="badge open">⚠️ ${PLAN_TYPES[rec]}</span>` : ''}</div>` : ''}</summary>
+      ${m ? `<div style="text-align:right"><div style="font-size:1.4rem">${m.icon}</div><div class="small">${Math.round(w.tmax)}° · ${w.rainH != null ? (w.rainH ? w.rainH + ' Std.' : 'trocken') : w.prob + '%'}</div>${rec ? `<span class="badge wx">☂️ ${PLAN_TYPES[rec]}</span>` : ''}</div>` : ''}</summary>
     <div class="body">
-      ${rec && opts.some(o => o.type === rec) ? `<div class="card alert" style="margin:0 0 10px">Wetter: <b>${PLAN_TYPES[rec]}</b>${auto ? ' – Plan B automatisch gewählt' : ' – Plan B empfohlen'}</div>` : ''}
+      ${rec && opts.some(o => o.type === rec) ? `<div class="card wxtip" style="margin:0 0 10px">☂️ <b>${PLAN_TYPES[rec]}</b>${auto ? ' – Plan B automatisch gewählt' : ' – Plan B empfohlen'}</div>` : ''}
       ${opts.length > 1 ? `<div class="seg">${opts.map(o => `<button data-choose="${date}|${o.key}" class="${o.key === opt.key ? 'on' : ''} ${o.type && o.type === rec ? 'rec' : ''}">${esc(o.label)}</button>`).join('')}</div>` : ''}
       <h3>${esc(opt.plan.title || '')}</h3>
       ${itemsHtml(opt.plan.items)}
