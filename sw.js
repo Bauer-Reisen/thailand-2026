@@ -1,10 +1,11 @@
 // Offline-Cache. Bei Änderungen an App-Dateien VERSION erhöhen.
-const VERSION = 'th26-v20';
+const VERSION = 'th26-v21';
 const SHELL = ['./', 'index.html', 'styles.css', 'shared.js', 'app.js', 'data/familie.enc.json', 'data/gaeste.enc.json', 'kids-map.js', 'bg.svg', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // cache: 'reload' – sonst kann die neue Fassung alte Dateien aus dem Browser-Zwischenspeicher übernehmen
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -46,7 +47,7 @@ self.addEventListener('fetch', e => {
   }
   // Rest: Cache zuerst, im Hintergrund auffrischen
   e.respondWith(caches.match(e.request).then(hit => {
-    const net = fetch(e.request).then(r => {
+    const net = fetch(e.request, { cache: 'no-cache' }).then(r => {
       if (r.ok) { const copy = r.clone(); caches.open(VERSION).then(c => c.put(e.request, copy)); }
       return r;
     }).catch(() => hit);

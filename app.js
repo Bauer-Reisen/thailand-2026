@@ -2586,5 +2586,10 @@ async function applyBg() {
   await loadTrip();
   route();
   if (trip && await loadWeather()) rerender();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) {
+    // neue Fassung geladen → einmal neu starten, damit sie sofort zu sehen ist
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !route.reloaded) { route.reloaded = true; location.reload(); } });
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {});
+  }
 })();
