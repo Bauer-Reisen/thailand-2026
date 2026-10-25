@@ -223,6 +223,24 @@ function weatherFor(placeId, date) {
   }
   return w;
 }
+/* Tagesverlauf: morgens, mittags, nachmittags, abends – damit man sieht, wann es regnet und dass der Rest gut ist */
+const DAY_PARTS = [['Morgens', 7, 11], ['Mittags', 11, 14], ['Nachmittags', 14, 18], ['Abends', 18, 22]];
+function wxParts(placeId, date) {
+  const h = store.get('wx', {})[placeId]?.hourly;
+  if (!h?.temperature_2m) return '';
+  const cells = DAY_PARTS.map(([label, from, to]) => {
+    const idx = h.time.map((t, k) => [t, k]).filter(([t]) => t.startsWith(date) && +t.slice(11, 13) >= from && +t.slice(11, 13) < to).map(([, k]) => k);
+    if (!idx.length) return '';
+    const wet = idx.filter(k => (h.precipitation[k] ?? 0) >= 0.5 && (h.precipitation_probability[k] ?? 0) >= 40);
+    const codes = idx.map(k => Math.min(h.weather_code[k], 3)).sort((a, b) => a - b);
+    const look = wet.length ? wmo(Math.max(...wet.map(k => h.weather_code[k]))) : wmo(codes[Math.floor(codes.length / 2)]);
+    const night = from >= 18 && !wet.length && look.icon === '☀️' ? '🌙' : look.icon;
+    const temp = Math.round(Math.max(...idx.map(k => h.temperature_2m[k])));
+    return `<div><span class="pl">${label}</span><span class="pi">${night}</span><b>${temp}°</b>
+      <span class="pr">${wet.length ? `${wet.length === idx.length ? 'Regen' : `${wet.length} Std. Regen`}` : 'trocken'}</span></div>`;
+  }).join('');
+  return cells ? `<div class="dayparts">${cells}</div>` : '';
+}
 // Symbol und Text für den Tag: kurze Schauer werden als solche benannt, nicht als Regentag
 function wxLook(w) {
   if (w.rainH == null || w.rainH >= 4) return wmo(w.code);
@@ -237,14 +255,14 @@ function sunScore(w) {
 async function loadWeather(force = false) {
   const cache = store.get('wx', {});
   const ids = ['bkk', 'samet'];
-  const stale = ids.some(id => !cache[id] || !cache[id].hourly || Date.now() - cache[id].ts > 3 * 3600000);
+  const stale = ids.some(id => !cache[id] || !cache[id].hourly?.temperature_2m || Date.now() - cache[id].ts > 3 * 3600000);
   if (!navigator.onLine || (!stale && !force)) return false;
   let changed = false;
   await Promise.all(ids.map(async id => {
     const p = trip.places[id];
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}` +
       '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max,sunset' +
-      '&hourly=weather_code,precipitation,precipitation_probability' +
+      '&hourly=weather_code,precipitation,precipitation_probability,temperature_2m' +
       `&timezone=${encodeURIComponent(p.tz)}&forecast_days=16`;
     try {
       const r = await fetch(url);
@@ -620,7 +638,7 @@ function renderToday(main) {
   html += isGuest() ? quickRow([['#/tagebuch', '📸', 'Tagebuch'], ['#/plan', '🗓️', 'Alle Tage'], ['#/woerter', '🗣️', 'Thai']])
     : quickRow([['#/ausgaben', '💶', eur(sp)], ['#/essen', '🍜', 'Essen'], ['#/woerter', '🗣️', 'Thai'], ['#/lernen', '📚', 'Lernen'], ['#/kinder', '🧸', 'Kinder'], ['#/tagebuch', '📸', 'Tagebuch']]);
   if (!isGuest()) html += alertCard(t.date);
-  html += `<h2>Die nächsten Tage</h2>${wxStrip(t.date)}<div class="pad small wxnote">${wxFoot()}</div>`;
+  html += `<h2>Heute im Tagesverlauf</h2>${wxParts(wplace, t.date)}<h2>Die nächsten Tage</h2>${wxStrip(t.date)}<div class="pad small wxnote">${wxFoot()}</div>`;
   html += `<h2>Heute · ${esc(opt?.label || '')}</h2><div class="card">${itemsHtml(items, { highlight: idx })}
     ${isGuest() ? '' : `<div class="btns"><a class="btn ghost small" href="#/plan/${t.date}">Plan ändern / neu generieren</a></div>`}</div></div>`;
   main.innerHTML = html;
@@ -696,6 +714,7 @@ function dayHtml(date, open) {
         <div class="small muted">${esc(trip.places[cal.place].name)} · ${esc(opt?.label || '')}</div></div>
       ${m ? `<div style="text-align:right"><div style="font-size:1.4rem">${m.icon}</div><div class="small">${Math.round(w.tmax)}° · ${w.rainH != null ? (w.rainH ? w.rainH + ' Std.' : 'trocken') : w.prob + '%'}</div>${rec ? `<span class="badge wx">☂️ ${PLAN_TYPES[rec]}</span>` : ''}</div>` : ''}</summary>
     <div class="body">
+      ${wxParts(cal.place === 'fra' ? 'bkk' : cal.place, date)}
       ${rec && opts.some(o => o.type === rec) ? `<div class="card wxtip" style="margin:0 0 10px">☂️ <b>${PLAN_TYPES[rec]}</b>${auto ? ' – Plan B automatisch gewählt' : ' – Plan B empfohlen'}</div>` : ''}
       ${opts.length > 1 ? `<div class="seg">${opts.map(o => `<button data-choose="${date}|${o.key}" class="${o.key === opt.key ? 'on' : ''} ${o.type && o.type === rec ? 'rec' : ''}">${esc(o.label)}</button>`).join('')}</div>` : ''}
       <h3>${esc(opt.plan.title || '')}</h3>

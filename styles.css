@@ -484,3 +484,12 @@ body.login .topbar #pageTitle { visibility: visible; }
 .card.wxtip, :is(.sheetpage, body.paper main) .card.wxtip { margin: 14px 16px; padding: 12px 16px; border-radius: 18px; border: 0; background: color-mix(in srgb, var(--brand) 10%, var(--raised)); color: inherit; }
 .card.openred, :is(.sheetpage, body.paper main) .card.openred { margin: 14px 16px; padding: 14px 16px; border-radius: 18px; border: 0; border-left: 5px solid #e63946; background: var(--bad-bg); color: var(--text); }
 .card.openred b { color: var(--bad-ink); }
+.dayparts { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0 16px 6px; border-top: 1px solid var(--sand-line); border-bottom: 1px solid var(--sand-line); }
+.dayparts > div { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 12px 2px; text-align: center; }
+.dayparts > div + div { border-left: 1px solid var(--sand-line); }
+.dayparts .pl { font-size: .74rem; font-weight: 600; color: var(--sand-muted); }
+.dayparts .pi { font-size: 1.6rem; line-height: 1.1; }
+.dayparts b { font: 600 1.05rem/1 var(--font-display); }
+.dayparts .pr { font-size: .72rem; color: var(--sand-muted); }
+details.day .body .dayparts { margin: 0 0 12px; }
+.seg button.rec { outline-color: var(--brand) !important; border-color: var(--brand) !important; }

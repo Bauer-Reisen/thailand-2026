@@ -1,5 +1,5 @@
 // Offline-Cache. Bei Änderungen an App-Dateien VERSION erhöhen.
-const VERSION = 'th26-v19';
+const VERSION = 'th26-v20';
 const SHELL = ['./', 'index.html', 'styles.css', 'shared.js', 'app.js', 'data/familie.enc.json', 'data/gaeste.enc.json', 'kids-map.js', 'bg.svg', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
