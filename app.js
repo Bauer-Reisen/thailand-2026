@@ -127,29 +127,7 @@ function recommendedType(date) {
   if (w.tmax >= 35) return 'hitze';
   return null;
 }
-/* Tage mit schlechtem Wetter in der Vorhersage (Open-Meteo reicht bis 16 Tage, verlässlich etwa eine Woche) */
-function weatherAlerts(fromDate) {
-  return trip.days.filter(d => d.date >= fromDate && d.place !== 'fra').map(d => {
-    const type = recommendedType(d.date), w = weatherFor(d.place, d.date);
-    if (!type || !w) return null;
-    const ahead = Math.round((new Date(d.date + 'T12:00:00Z') - new Date(fromDate + 'T12:00:00Z')) / 86400000);
-    return { date: d.date, type, w, ahead, src: sourceDay(d.date), plan: activePlan(d.date) };
-  }).filter(Boolean);
-}
-function alertCard(fromDate) {
-  const list = weatherAlerts(fromDate);
-  if (!list.length) return '';
-  const seen = store.get('wxAlertSeen', {});
-  const fresh = list.filter(x => seen[x.date] !== x.type);
-  const swap = sunnySwapSuggestion();
-  return `<div class="card warnbox"><div class="row between"><b>☂️ Wetter-Tipp${list.length > 1 ? ` für ${list.length} Tage` : ''}</b>${fresh.length ? `<button class="btn small ghost" id="wxSeen">Gesehen</button>` : ''}</div>
-    ${list.map(x => `<a class="warnrow" href="#/plan/${x.date}"><span class="d">${dayLabel(x.date)}${seen[x.date] !== x.type ? ' <span class="badge">neu</span>' : ''}</span>
-      <span class="grow"><b>${wxLook(x.w).icon} ${x.type === 'hitze' ? `${Math.round(x.w.tmax)}° Hitze` : x.w.rainH != null ? `${wxLook(x.w).text}, ca. ${x.w.rainH} Std. Regen tagsüber` : `${wxLook(x.w).text}, Regen ${x.w.prob} %`}</b> · ${esc(x.src.title)}
-      <span class="small muted" style="display:block">${x.plan.opt.key === 'A' ? 'Plan A geplant – Plan B ansehen' : `${esc(x.plan.opt.label)} ${x.plan.auto ? 'automatisch gewählt' : 'gewählt'}`}${x.ahead > 7 ? ' · Vorhersage noch unsicher' : ''}</span></span></a>`).join('')}
-    ${swap ? `<div class="btns"><button class="btn small" data-wxswap="${swap.from}|${swap.to}">☀️ ${esc(swap.title)} auf ${dayLabel(swap.to)} legen</button></div>` : ''}</div>`;
-}
 document.addEventListener('click', e => {
-  if (e.target.closest('#wxSeen')) { const s = store.get('wxAlertSeen', {}); weatherAlerts(today().date).forEach(x => (s[x.date] = x.type)); store.set('wxAlertSeen', s); rerender(); }
   const sw = e.target.closest('[data-wxswap]');
   if (sw) { const [x, y] = sw.dataset.wxswap.split('|'); swapDays(x, y); toast(`Getauscht: ${dayLabel(x)} ⇄ ${dayLabel(y)}`); rerender(); }
 });
@@ -506,7 +484,7 @@ function itemsHtml(items, opts = {}) {
     </li>`).join('')}</ol>`;
 }
 /* Wetter-Leiste: die nächsten Tage auf einen Blick, schlechte Tage rot */
-function wxStrip(fromDate, n = 8) {
+function wxStrip(fromDate, n = 10) {
   const days = trip.days.filter(d => d.date >= fromDate && d.place !== 'fra').slice(0, n);
   const cells = days.map(d => {
     const w = weatherFor(d.place, d.date);
@@ -515,9 +493,12 @@ function wxStrip(fromDate, n = 8) {
     return `<a href="#/plan/${d.date}" class="${d.date === fromDate ? 'today' : ''} ${rec ? 'bad' : ''}">
       <span class="wd">${d.date === fromDate ? 'Heute' : dt.toLocaleDateString('de-DE', { weekday: 'short', timeZone: 'UTC' })}</span>
       <span class="wi">${w ? wxLook(w).icon : '·'}</span><b>${w ? Math.round(w.tmax) + '°' : '–'}</b>
-      <span class="wr">${w ? (w.rainH != null ? (w.rainH ? w.rainH + ' Std.' : 'trocken') : w.prob + ' %') : ''}</span></a>`;
+      <span class="wr">${w ? (w.rainH != null ? (w.rainH ? w.rainH + ' Std.' : 'trocken') : w.prob + ' %') : ''}</span>
+      ${rec ? `<span class="pb">${activePlan(d.date).opt.key === 'A' ? 'Plan B?' : 'Plan B'}</span>` : ''}</a>`;
   }).join('');
-  return `<div class="days7" role="list">${cells}</div>`;
+  const swap = !isGuest() && sunnySwapSuggestion();
+  return `<div class="days7" role="list">${cells}</div>
+    ${swap ? `<div class="pad btns"><button class="btn small ghost" data-wxswap="${swap.from}|${swap.to}">☀️ ${esc(swap.title)} auf ${dayLabel(swap.to)} legen</button></div>` : ''}`;
 }
 /* Termine, die nicht verpasst werden dürfen (z. B. digitale Einreisekarte) */
 function reminderCards(onlyRelevant) {
@@ -587,7 +568,7 @@ function renderToday(main) {
       <span class="glass">🇹🇭 ${fmtMin(bk.min)} Uhr${bk.date !== t.date ? ` (${dayLabel(bk.date)})` : ''}</span></div></header><div class="sheetpage">`;
     if (!isGuest()) html += reminderCards(false) + checkinCards(false);
     if (!isGuest()) html += quickRow([['ics', '📅', 'Kalender'], ['#/abgleich', '⬇︎', 'Offline'], ['#/liste', '✅', 'Packliste'], ['#/fluege', '✈️', 'Flüge'], ['#/lernen', '📚', 'Lernen'], ['#/kinder', '🧸', 'Kinder']])
-      + alertCard(start) + openPointsCard();
+      + openPointsCard();
     html += `<h2>Wetter in Thailand</h2>${wxStrip(start)}<div class="pad small wxnote">${wxFoot()}</div></div>`;
     main.innerHTML = html;
     return;
@@ -637,7 +618,6 @@ function renderToday(main) {
   const sp = isGuest() ? 0 : spentOn(t.date);
   html += isGuest() ? quickRow([['#/tagebuch', '📸', 'Tagebuch'], ['#/plan', '🗓️', 'Alle Tage'], ['#/woerter', '🗣️', 'Thai']])
     : quickRow([['#/ausgaben', '💶', eur(sp)], ['#/essen', '🍜', 'Essen'], ['#/woerter', '🗣️', 'Thai'], ['#/lernen', '📚', 'Lernen'], ['#/kinder', '🧸', 'Kinder'], ['#/tagebuch', '📸', 'Tagebuch']]);
-  if (!isGuest()) html += alertCard(t.date);
   html += `<h2>Heute im Tagesverlauf</h2>${wxParts(wplace, t.date)}<h2>Die nächsten Tage</h2>${wxStrip(t.date)}<div class="pad small wxnote">${wxFoot()}</div>`;
   html += `<h2>Heute · ${esc(opt?.label || '')}</h2><div class="card">${itemsHtml(items, { highlight: idx })}
     ${isGuest() ? '' : `<div class="btns"><a class="btn ghost small" href="#/plan/${t.date}">Plan ändern / neu generieren</a></div>`}</div></div>`;
@@ -676,7 +656,6 @@ function renderPlan(main, openDate) {
   const t = today();
   let html = `<div class="card small">Jeder Tag hat Plan A und Plan B. Bei schlechtem Wetter wird Plan B automatisch vorgeschlagen. ${wxStampShort()}</div>`;
   const sunny = false;
-  if (!isGuest()) html += alertCard(t.date < trip.meta.start ? trip.meta.start : t.date);
   if (sunny) html += `<div class="card wxtip"><b>☀️ ${esc(sunny.title)}</b> liegt auf ${dayLabel(sunny.from)}, sonnigster Tag laut Vorhersage: ${dayLabel(sunny.to)}
       <div class="btns"><button class="btn" data-sunswap="${sunny.from}|${sunny.to}">Auf ${dayLabel(sunny.to)} legen</button></div></div>`;
   html += trip.days.map(d => dayHtml(d.date, d.date === (openDate || t.date))).join('');
@@ -1184,8 +1163,8 @@ function renderPacking(main) {
   const groups = [...trip.packing, ...(extra.length ? [{ group: 'Eigene', items: extra, own: true }] : [])];
   const all = groups.flatMap(g => g.items.map(i => `pack:${g.group}:${i}`));
   const done = all.filter(isChecked).length;
-  main.innerHTML = `<div class="card"><div class="row between"><b>${done} von ${all.length} erledigt</b></div>
-    <div class="meter"><div style="width:${(done / Math.max(all.length, 1)) * 100}%"></div></div></div>` +
+  main.innerHTML = `<div class="card"><div class="row between"><b id="packCount">${done} von ${all.length} erledigt</b></div>
+    <div class="meter"><div id="packMeter" style="width:${(done / Math.max(all.length, 1)) * 100}%"></div></div></div>` +
     groups.map(g => `<h2>${esc(g.group)}</h2><div class="card">${g.items.map(i => {
       const k = `pack:${g.group}:${i}`;
       return `<label class="check ${isChecked(k) ? 'done' : ''}"><input type="checkbox" data-key="${esc(k)}" ${isChecked(k) ? 'checked' : ''}>
@@ -1194,7 +1173,11 @@ function renderPacking(main) {
     `<div class="card"><label class="field"><span>Eigener Punkt</span><input id="newPack" placeholder="z. B. Lieblingskissen"></label><button class="btn small" id="addPack">Hinzufügen</button></div>`;
   main.addEventListener('change', e => {
     const cb = e.target.closest('input[data-key]');
-    if (cb) { setChecked(cb.dataset.key, cb.checked); cb.closest('.check').classList.toggle('done', cb.checked); }
+    if (!cb) return;
+    setChecked(cb.dataset.key, cb.checked); cb.closest('.check').classList.toggle('done', cb.checked);
+    const n = all.filter(isChecked).length;
+    $('#packCount').textContent = `${n} von ${all.length} erledigt`;
+    $('#packMeter').style.width = `${(n / Math.max(all.length, 1)) * 100}%`;
   });
   main.addEventListener('click', e => {
     if (e.target.closest('#addPack')) {
