@@ -494,3 +494,10 @@ body.login .topbar #pageTitle { visibility: visible; }
 details.day .body .dayparts { margin: 0 0 12px; }
 .seg button.rec { outline-color: var(--brand) !important; border-color: var(--brand) !important; }
 .days7 .pb { font-size: .68rem; font-weight: 700; color: var(--brand); background: color-mix(in srgb, var(--brand) 12%, transparent); border-radius: 999px; padding: 1px 7px; margin-top: 2px; }
+.memscore { display: flex; gap: 8px; margin-bottom: 10px; }
+.memscore:empty { display: none; }
+.memscore > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 14px; border: 2px solid transparent; background: var(--chip); }
+.memscore > div.on { border-color: var(--pc); background: color-mix(in srgb, var(--pc) 16%, transparent); }
+.memscore > div.on b::before { content: "👉 "; }
+.memscore span { font-size: .82rem; color: var(--muted); }
+.memscore > div.win b::before { content: none; }

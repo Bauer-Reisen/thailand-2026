@@ -1859,7 +1859,9 @@ function renderKids(main) {
       <div class="seg">${opts.map((o, j) => `<button type="button" data-ans="${i}|${j}" class="${q[i] != null ? (j === right ? 'right' : j === q[i] ? 'wrong' : '') : ''}">${esc(o)}</button>`).join('')}</div></div>`).join('')}
       <div class="row between"><b id="quizScore">${Object.entries(q).filter(([i, v]) => QUIZ[i][2] === v).length} von ${QUIZ.length} richtig</b><button class="btn small ghost" id="quizReset">Neu</button></div></div>
     <h2>Memory</h2>
-    <div class="card"><div class="memory" id="memory"></div><div class="row between small" style="margin-top:8px"><span id="memMoves"></span><button class="btn small ghost" id="memNew">Neu mischen</button></div></div>
+    <div class="card"><div class="small muted">Wer spielt mit? Antippen zum Auswählen.</div><div class="seg" id="memWho" style="margin:6px 0 10px"></div>
+      <div class="memscore" id="memScore"></div><div class="memory" id="memory"></div>
+      <div class="row between small" style="margin-top:8px"><span id="memMoves"></span><button class="btn small ghost" id="memNew">Neu mischen</button></div></div>
     <h2>Spiele ohne alles</h2>
     <div class="card">${GAMES.map(([t2, d]) => `<p><b>${esc(t2)}</b><br><span class="small">${esc(d)}</span></p>`).join('')}</div>`;
   startMemory();
@@ -1886,24 +1888,56 @@ function renderKids(main) {
     if (e.target.closest('#memNew')) startMemory();
   });
 }
+/* Memory gegeneinander: wer ein Pärchen findet, darf weitermachen, sonst ist der Nächste dran */
+const MEM_COLORS = ['#0b6e7d', '#e8664a', '#7a4fd0', '#2f8f3a'];
+function memPlayers() {
+  const kids = [...new Set(learnData().days.flatMap(d => d.units.map(u => u.who)))].filter(Boolean);
+  return [...(kids.length ? kids : ['Kind 1', 'Kind 2']), 'Mama', 'Papa'];
+}
 function startMemory() {
   const icons = ['🐘', '🥭', '🛺', '🐒', '🏝️', '🐠', '🦀', '🥥'];
   const cards = [...icons, ...icons].map(v => ({ v, r: Math.random() })).sort((x, y) => x.r - y.r).map(c => c.v);
   const box = $('#memory');
-  let open = [], moves = 0, found = 0;
+  const all = memPlayers();
+  let chosen = store.get('memPlayers', all.slice(0, 2)).filter(n => all.includes(n));
+  if (!chosen.length) chosen = all.slice(0, 2);
+  const players = chosen.map(n => ({ n, pairs: 0 }));
+  let open = [], moves = 0, found = 0, turn = 0;
+  const multi = players.length > 1;
+  const color = i => MEM_COLORS[all.indexOf(players[i].n) % MEM_COLORS.length];
+  const paintScore = () => {
+    const done = found === icons.length, best = Math.max(...players.map(p => p.pairs));
+    $('#memScore').innerHTML = multi ? players.map((p, i) => `<div class="${i === turn && !done ? 'on' : ''} ${done && p.pairs === best ? 'on win' : ''}" style="--pc:${color(i)}">
+      <b>${done && p.pairs === best ? '🏆 ' : ''}${esc(p.n)}</b><span>${p.pairs} Pärchen</span></div>`).join('') : '';
+    $('#memMoves').textContent = found === icons.length ? endText() : multi ? `${players[turn].n} ist dran` : `Züge: ${moves}`;
+  };
+  const endText = () => {
+    if (!multi) return `Geschafft in ${moves} Zügen! 🎉`;
+    const best = Math.max(...players.map(p => p.pairs)), win = players.filter(p => p.pairs === best);
+    return win.length > 1 ? `Unentschieden: ${win.map(p => p.n).join(' und ')} 🎉` : `${win[0].n} gewinnt mit ${best} Pärchen! 🏆`;
+  };
+  $('#memWho').innerHTML = all.map(n => `<button type="button" data-who="${esc(n)}" class="${chosen.includes(n) ? 'on' : ''}">${esc(n)}</button>`).join('');
+  $('#memWho').onclick = e => {
+    const b = e.target.closest('[data-who]'); if (!b) return;
+    const n = b.dataset.who, next = chosen.includes(n) ? chosen.filter(x => x !== n) : all.filter(x => chosen.includes(x) || x === n);
+    if (!next.length) return;
+    store.set('memPlayers', next); startMemory();
+  };
   box.innerHTML = cards.map((v, i) => `<button type="button" data-i="${i}" aria-label="Karte"><span>${v}</span></button>`).join('');
-  $('#memMoves').textContent = 'Züge: 0';
+  paintScore();
   box.onclick = e => {
     const b = e.target.closest('button[data-i]');
     if (!b || b.classList.contains('up') || open.length === 2) return;
     b.classList.add('up'); open.push(b);
     if (open.length < 2) return;
-    moves++; $('#memMoves').textContent = `Züge: ${moves}`;
+    moves++;
     const [x, y] = open;
     if (cards[x.dataset.i] === cards[y.dataset.i]) {
-      x.classList.add('done'); y.classList.add('done'); open = []; found++;
-      if (found === icons.length) $('#memMoves').textContent = `Geschafft in ${moves} Zügen! 🎉`;
-    } else setTimeout(() => { x.classList.remove('up'); y.classList.remove('up'); open = []; }, 900);
+      [x, y].forEach(c => { c.classList.add('done'); if (multi) c.style.background = color(turn) + '33'; });
+      open = []; found++; players[turn].pairs++;
+      if (multi && found < icons.length) toast(`Pärchen! ${players[turn].n} darf nochmal.`);
+      paintScore();
+    } else setTimeout(() => { x.classList.remove('up'); y.classList.remove('up'); open = []; turn = (turn + 1) % players.length; paintScore(); }, 900);
   };
 }
 
