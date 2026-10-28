@@ -501,3 +501,24 @@ details.day .body .dayparts { margin: 0 0 12px; }
 .memscore > div.on b::before { content: "👉 "; }
 .memscore span { font-size: .82rem; color: var(--muted); }
 .memscore > div.win b::before { content: none; }
+/* Memory im eigenen Fenster */
+body.noscroll { overflow: hidden; }
+#toast { z-index: 60; }
+.memov { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; gap: 8px; background: var(--sand, #fbf6ee);
+  padding: calc(10px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)); color: var(--text); }
+:root[data-theme="dark"] .memov { background: #0b0e1a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .memov { background: #0b0e1a; } }
+.memhead { display: flex; align-items: center; gap: 8px; }
+.memhead .memscore { flex: 1; margin: 0; }
+.memx { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--chip); color: var(--text); font-size: 1.2rem; cursor: pointer; }
+.memstatus { text-align: center; font: 600 1rem/1.3 var(--font-display); min-height: 1.3em; }
+.memfield { flex: 1; min-height: 0; display: grid; place-items: center; }
+.memov .memory { gap: 8px; justify-content: center; }
+.memov .memory button { width: var(--ms); height: var(--ms); aspect-ratio: auto; font-size: calc(var(--ms) * .5); padding: 0; }
+.memhead { flex-wrap: wrap; justify-content: space-between; }
+.memhead .memscore { order: 3; flex: 1 0 100%; }
+.memscore > div { min-width: 0; }
+.memscore b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+body.noscroll #toast { bottom: auto; top: calc(12px + env(safe-area-inset-top)); }
+.memtitle { font: 600 1.1rem/1 var(--font-display); }
+.memov .memscore > div.on b::before { content: none; }

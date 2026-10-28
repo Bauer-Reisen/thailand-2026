@@ -1861,11 +1861,11 @@ function renderKids(main) {
       <div class="row between"><b id="quizScore">${Object.entries(q).filter(([i, v]) => QUIZ[i][2] === v).length} von ${QUIZ.length} richtig</b><button class="btn small ghost" id="quizReset">Neu</button></div></div>
     <h2>Memory</h2>
     <div class="card"><div class="small muted">Wer spielt mit? Antippen zum Auswählen.</div><div class="seg" id="memWho" style="margin:6px 0 10px"></div>
-      <div class="memscore" id="memScore"></div><div class="memory" id="memory"></div>
-      <div class="row between small" style="margin-top:8px"><span id="memMoves"></span><button class="btn small ghost" id="memNew">Neu mischen</button></div></div>
+      <div class="small muted">Wie groß?</div><div class="seg" id="memSize" style="margin:6px 0 12px"></div>
+      <button class="btn block" id="memStart">▶︎ Memory spielen</button></div>
     <h2>Spiele ohne alles</h2>
     <div class="card">${GAMES.map(([t2, d]) => `<p><b>${esc(t2)}</b><br><span class="small">${esc(d)}</span></p>`).join('')}</div>`;
-  startMemory();
+  memSetup();
   main.addEventListener('click', e => {
     const r = e.target.closest('[data-read]');
     if (r) {
@@ -1886,7 +1886,7 @@ function renderKids(main) {
       $('#quizScore').textContent = `${Object.entries(s).filter(([k, v]) => QUIZ[k][2] === v).length} von ${QUIZ.length} richtig`;
     }
     if (e.target.closest('#quizReset')) { store.del('quiz'); rerender(); }
-    if (e.target.closest('#memNew')) startMemory();
+    if (e.target.closest('#memStart')) playMemory();
   });
 }
 /* Memory gegeneinander: wer ein Pärchen findet, darf weitermachen, sonst ist der Nächste dran */
@@ -1895,37 +1895,72 @@ function memPlayers() {
   const kids = [...new Set(learnData().days.flatMap(d => d.units.map(u => u.who)))].filter(Boolean);
   return [...(kids.length ? kids : ['Kind 1', 'Kind 2']), 'Mama', 'Papa'];
 }
-function startMemory() {
-  const icons = ['🐘', '🥭', '🛺', '🐒', '🏝️', '🐠', '🦀', '🥥'];
-  const cards = [...icons, ...icons].map(v => ({ v, r: Math.random() })).sort((x, y) => x.r - y.r).map(c => c.v);
-  const box = $('#memory');
+const MEM_ICONS = ['🐘', '🥭', '🛺', '🐒', '🏝️', '🐠', '🦀', '🥥', '🐢', '🦜', '🍍', '🌺', '🛕', '⛵', '🍜'];
+const MEM_SIZES = [['klein', 8, '16 Karten'], ['mittel', 12, '24 Karten'], ['gross', 15, '30 Karten']];
+function memSetup() {
+  const all = memPlayers();
+  const chosen = store.get('memPlayers', all.slice(0, 2)).filter(n => all.includes(n));
+  const size = store.get('memSize', 'klein');
+  $('#memWho').innerHTML = all.map(n => `<button type="button" data-who="${esc(n)}" class="${chosen.includes(n) ? 'on' : ''}">${esc(n)}</button>`).join('');
+  $('#memSize').innerHTML = MEM_SIZES.map(([k, , label]) => `<button type="button" data-size="${k}" class="${k === size ? 'on' : ''}">${label}</button>`).join('');
+  $('#memWho').onclick = e => {
+    const b = e.target.closest('[data-who]'); if (!b) return;
+    const cur = store.get('memPlayers', all.slice(0, 2)).filter(n => all.includes(n)), n = b.dataset.who;
+    const next = cur.includes(n) ? cur.filter(x => x !== n) : all.filter(x => cur.includes(x) || x === n);
+    if (next.length) { store.set('memPlayers', next); memSetup(); }
+  };
+  $('#memSize').onclick = e => { const b = e.target.closest('[data-size]'); if (b) { store.set('memSize', b.dataset.size); memSetup(); } };
+}
+/* Memory im eigenen Fenster über der Seite: die Karten werden so groß, dass alles ohne Scrollen passt */
+function playMemory() {
   const all = memPlayers();
   let chosen = store.get('memPlayers', all.slice(0, 2)).filter(n => all.includes(n));
   if (!chosen.length) chosen = all.slice(0, 2);
+  const pairs = (MEM_SIZES.find(x => x[0] === store.get('memSize', 'klein')) || MEM_SIZES[0])[1];
+  const icons = MEM_ICONS.slice(0, pairs);
+  const cards = [...icons, ...icons].map(v => ({ v, r: Math.random() })).sort((x, y) => x.r - y.r).map(c => c.v);
   const players = chosen.map(n => ({ n, pairs: 0 }));
   let open = [], moves = 0, found = 0, turn = 0;
   const multi = players.length > 1;
   const color = i => MEM_COLORS[all.indexOf(players[i].n) % MEM_COLORS.length];
-  const paintScore = () => {
-    const done = found === icons.length, best = Math.max(...players.map(p => p.pairs));
-    $('#memScore').innerHTML = multi ? players.map((p, i) => `<div class="${i === turn && !done ? 'on' : ''} ${done && p.pairs === best ? 'on win' : ''}" style="--pc:${color(i)}">
-      <b>${done && p.pairs === best ? '🏆 ' : ''}${esc(p.n)}</b><span>${p.pairs} Pärchen</span></div>`).join('') : '';
-    $('#memMoves').textContent = found === icons.length ? endText() : multi ? `${players[turn].n} ist dran` : `Züge: ${moves}`;
+  document.querySelector('.memov')?.remove();
+  const ov = document.createElement('div');
+  ov.className = 'memov';
+  ov.innerHTML = `<div class="memhead"><button type="button" class="memx" aria-label="Schließen">✕</button><b class="memtitle">Memory</b><div class="memscore" id="memScore"></div>
+    <button type="button" class="btn small ghost" id="memAgain">Neu</button></div>
+    <div class="memstatus" id="memMoves"></div><div class="memfield"><div class="memory" id="memory"></div></div>`;
+  document.body.appendChild(ov);
+  document.body.classList.add('noscroll');
+  const box = $('#memory', ov), field = $('.memfield', ov);
+  // Spalten und Kartengröße passend zum Bildschirm (hoch oder quer)
+  const layout = () => {
+    const W = field.clientWidth, H = field.clientHeight, n = cards.length, gap = 8;
+    let best = { size: 0, cols: 4 };
+    for (let cols = 3; cols <= 10; cols++) {
+      const rows = Math.ceil(n / cols), size = Math.min((W - gap * (cols - 1)) / cols, (H - gap * (rows - 1)) / rows);
+      if (n % cols === 0 && size > best.size) best = { size, cols };
+    }
+    box.style.gridTemplateColumns = `repeat(${best.cols}, ${Math.floor(best.size)}px)`;
+    box.style.setProperty('--ms', `${Math.floor(best.size)}px`);
   };
+  const close = () => { ov.remove(); document.body.classList.remove('noscroll'); removeEventListener('resize', layout); };
   const endText = () => {
     if (!multi) return `Geschafft in ${moves} Zügen! 🎉`;
     const best = Math.max(...players.map(p => p.pairs)), win = players.filter(p => p.pairs === best);
     return win.length > 1 ? `Unentschieden: ${win.map(p => p.n).join(' und ')} 🎉` : `${win[0].n} gewinnt mit ${best} Pärchen! 🏆`;
   };
-  $('#memWho').innerHTML = all.map(n => `<button type="button" data-who="${esc(n)}" class="${chosen.includes(n) ? 'on' : ''}">${esc(n)}</button>`).join('');
-  $('#memWho').onclick = e => {
-    const b = e.target.closest('[data-who]'); if (!b) return;
-    const n = b.dataset.who, next = chosen.includes(n) ? chosen.filter(x => x !== n) : all.filter(x => chosen.includes(x) || x === n);
-    if (!next.length) return;
-    store.set('memPlayers', next); startMemory();
+  const paintScore = () => {
+    const done = found === icons.length, best = Math.max(...players.map(p => p.pairs));
+    $('#memScore', ov).innerHTML = multi ? players.map((p, i) => `<div class="${i === turn && !done ? 'on' : ''} ${done && p.pairs === best ? 'on win' : ''}" style="--pc:${color(i)}">
+      <b>${done && p.pairs === best ? '🏆 ' : ''}${esc(p.n)}</b><span>${p.pairs} Pärchen</span></div>`).join('') : '';
+    $('#memMoves', ov).textContent = done ? endText() : multi ? `${players[turn].n} ist dran` : `Züge: ${moves}`;
   };
   box.innerHTML = cards.map((v, i) => `<button type="button" data-i="${i}" aria-label="Karte"><span>${v}</span></button>`).join('');
   paintScore();
+  requestAnimationFrame(layout);
+  addEventListener('resize', layout);
+  $('.memx', ov).onclick = close;
+  $('#memAgain', ov).onclick = () => { close(); playMemory(); };
   box.onclick = e => {
     const b = e.target.closest('button[data-i]');
     if (!b || b.classList.contains('up') || open.length === 2) return;
