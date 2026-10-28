@@ -2618,6 +2618,8 @@ async function applyBg() {
   try {
     const bg = (await docsDb.all()).find(d => d.id === 'bg');
     document.documentElement.style.setProperty('--bgimg', bg ? `url("${URL.createObjectURL(bg.blob)}")` : 'url("bg.svg")');
+    // eigenes Foto soll auch im Dunkelmodus zu sehen sein (sonst gilt dort der Nacht-Hintergrund)
+    document.documentElement.classList.toggle('ownbg', !!bg);
   } catch {}
 }
 (async function init() {

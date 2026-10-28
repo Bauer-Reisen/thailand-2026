@@ -522,3 +522,10 @@ body.noscroll { overflow: hidden; }
 body.noscroll #toast { bottom: auto; top: calc(12px + env(safe-area-inset-top)); }
 .memtitle { font: 600 1.1rem/1 var(--font-display); }
 .memov .memscore > div.on b::before { content: none; }
+/* eigenes Hintergrundfoto auch im Dunkelmodus, abgedunkelt */
+:root[data-theme="dark"].ownbg body::before { background: #0b0e1a var(--bgimg) center / cover no-repeat; }
+:root[data-theme="dark"].ownbg body::after { display: block; background: linear-gradient(180deg, rgba(5, 8, 18, .45), rgba(5, 8, 18, .75) 45%, rgba(5, 8, 18, .9)); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]).ownbg body::before { background: #0b0e1a var(--bgimg) center / cover no-repeat; }
+  :root:not([data-theme="light"]).ownbg body::after { display: block; background: linear-gradient(180deg, rgba(5, 8, 18, .45), rgba(5, 8, 18, .75) 45%, rgba(5, 8, 18, .9)); }
+}
