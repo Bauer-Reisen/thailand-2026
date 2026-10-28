@@ -709,7 +709,8 @@ function dayHtml(date, open) {
 function bindPlan(main) {
   main.addEventListener('click', e => {
     const c = e.target.closest('[data-choose]');
-    if (c) { const [d, k] = c.dataset.choose.split('|'); setChoice(d, k); return rerender(); }
+    // nur diesen Tag neu zeichnen und aufgeklappt lassen, damit Plan B sofort zu sehen ist
+    if (c) { const [d, k] = c.dataset.choose.split('|'); setChoice(d, k); c.closest('details.day').outerHTML = dayHtml(d, true); return; }
     const s = e.target.closest('[data-sunswap]');
     if (s) { const [a, b] = s.dataset.sunswap.split('|'); swapDays(a, b); toast(`Getauscht: ${dayLabel(a)} ⇄ ${dayLabel(b)}`); return rerender(); }
     const g = e.target.closest('[data-gen]');
