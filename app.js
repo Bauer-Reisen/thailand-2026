@@ -525,6 +525,9 @@ function checkinCards(onlyRelevant) {
     const opens = new Date(c.opens).getTime();
     const flight = trip.flights.find(f => c.label.includes(f.number));
     const dep = flight ? new Date(flight.dep).getTime() : opens + 86400000;
+    // abgehakt wie bei den Erinnerungen (gleicher Speicher, Schlüssel je Flug)
+    const doneKey = `checkin:${flight?.number || c.label}`;
+    if (store.get('remDone', {})[doneKey]) return '';
     if (onlyRelevant && (n < opens - 3 * 86400000 || n > dep)) return '';
     const open = n >= opens && n < dep;
     const code = store.get('codes', {}).condor;
@@ -535,7 +538,7 @@ function checkinCards(onlyRelevant) {
       <div class="small">${esc(c.note)}</div>
       ${code ? `<div class="row" style="margin-top:8px"><span class="code">${esc(code)}</span><button class="btn small ghost" data-copy="${esc(code)}">Kopieren</button></div>`
              : '<div class="small" style="margin-top:6px">Buchungsnummer fehlt → <a href="#/codes">Meine Codes</a></div>'}
-      <div class="btns"><a class="btn" href="${esc(c.url)}" target="_blank" rel="noopener">Zu Condor ↗</a></div>
+      <div class="btns"><a class="btn" href="${esc(c.url)}" target="_blank" rel="noopener">Zu Condor ↗</a><button class="btn ghost" data-remdone="${esc(doneKey)}">✓ Erledigt</button></div>
     </div>`;
   }).join('');
 }
