@@ -1283,7 +1283,7 @@ function renderSync(main) {
     $('#preload').disabled = false;
   });
   $('#exp').addEventListener('click', () => {
-    const data = { app: APP, v: 1, exported: new Date().toISOString(), expenses: store.get('expenses', []), checks: store.get('checks', {}), plans: store.get('plans', {}), swaps: store.get('swaps', {}), packExtra: store.get('packExtra', []), fx: fx(), budget: budget(), atmFee: atmFeeDefault(), cardFee: cardFeePct() };
+    const data = { app: APP, v: 1, exported: new Date().toISOString(), expenses: store.get('expenses', []), checks: store.get('checks', {}), plans: store.get('plans', {}), swaps: store.get('swaps', {}), packExtra: store.get('packExtra', []), foodHidden: store.get('foodHidden', []), fx: fx(), budget: budget(), atmFee: atmFeeDefault(), cardFee: cardFeePct() };
     downloadOrShare(new Blob([JSON.stringify(data)], { type: 'application/json' }), `thailand-abgleich-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`);
   });
   $('#imp').addEventListener('change', async e => {
@@ -1316,6 +1316,7 @@ function mergeSync(d) {
   store.set('plans', newer(store.get('plans', {}), d.plans));
   if ((d.swaps?._t || 0) > (store.get('swaps', {})._t || 0)) store.set('swaps', d.swaps);
   store.set('packExtra', [...new Set([...store.get('packExtra', []), ...(d.packExtra || [])])]);
+  store.set('foodHidden', [...new Set([...store.get('foodHidden', []), ...(d.foodHidden || [])])]);
   return n;
 }
 
@@ -1346,7 +1347,10 @@ function renderFood(main) {
   const f = trip.food;
   if (!f) { main.innerHTML = '<div class="card">Noch keine Restaurants hinterlegt.</div>'; return; }
   const here = calendarDay(today().date)?.place === 'samet' ? 'samet' : 'bkk';
-  const order = [...new Set([here, ...f.places.map(r => r.place)])].filter(pl => f.places.some(r => r.place === pl));
+  // Ausgeblendete Tipps (auf diesem Handy) bleiben weg, bis man sie wieder zeigt
+  const hidden = store.get('foodHidden', []);
+  const shown = f.places.filter(r => !hidden.includes(r.name));
+  const order = [...new Set([here, ...shown.map(r => r.place)])].filter(pl => shown.some(r => r.place === pl));
   const card = r => `<div class="card">
       <b>${esc(r.name)}</b>
       <div><span class="badge ${/Michelin/.test(r.badge) ? 'ok' : ''}">${esc(r.badge)}</span></div>
@@ -1355,15 +1359,22 @@ function renderFood(main) {
       <div class="small">🧒 ${esc(r.kids)}</div>
       ${r.note ? `<div class="small">${esc(r.note)}</div>` : ''}${r.check ? ' <span class="badge warn">zu prüfen</span>' : ''}
       <div class="btns"><a class="btn small" href="${mapsUrl(r.maps)}" target="_blank" rel="noopener">📍 Karte & Bewertungen</a>
-        <a class="btn small ghost" href="${photosUrl(r.maps)}" target="_blank" rel="noopener">📷 Fotos</a></div></div>`;
+        <a class="btn small ghost" href="${photosUrl(r.maps)}" target="_blank" rel="noopener">📷 Fotos</a>
+        <button class="btn small ghost" data-foodhide="${esc(r.name)}">👎 Ausblenden</button></div></div>`;
   main.innerHTML = `<div class="card small">Ausgewählt nach Michelin Guide und gut bewerteten Häusern, nur mit Sitzplätzen oder gut zum Mitnehmen. Bewertungen ändern sich – vor dem Besuch kurz in Google Maps reinschauen.</div>
     <div class="btns pad"><a class="btn" href="${mapsUrl('Restaurant')}" target="_blank" rel="noopener">🍽️ Restaurants in der Nähe</a></div>
-    ${order.map(pl => `<h2>${esc(trip.places[pl].name)}${pl === here ? ' (ihr seid hier)' : ''}</h2>${f.places.filter(r => r.place === pl).map(card).join('')}`).join('')}
+    ${order.map(pl => `<h2>${esc(trip.places[pl].name)}${pl === here ? ' (ihr seid hier)' : ''}</h2>${shown.filter(r => r.place === pl).map(card).join('')}`).join('')}
+    ${hidden.length ? `<p class="pad small muted">${hidden.length} ausgeblendet · <button class="linkbtn" id="foodUnhide">wieder zeigen</button></p>` : ''}
     <h2>Was Kinder meist mögen</h2><div class="card"><dl class="kv">${f.kidsDishes.map(([d, e]) => `<dt><b>${esc(d)}</b></dt><dd style="font-weight:400">${esc(e)}</dd>`).join('')}</dl>
       <p class="small" style="margin-bottom:0">„Mai phet“ = nicht scharf. Mehr unter <a href="#/woerter">Thai-Wörter</a>.</p></div>
     <h2>Gegen Bauchweh</h2><div class="card"><ul style="margin:0;padding-left:20px">${f.tips.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
     <h2>Bewusst nicht dabei</h2><div class="card">${f.excluded.map(([n, why]) => `<p class="small"><b>${esc(n)}</b>: ${esc(why)}</p>`).join('')}</div>
     <p class="pad small muted">Quellen: ${esc(f.sources)}</p>`;
+  main.addEventListener('click', e => {
+    const h = e.target.closest('[data-foodhide]');
+    if (h) { store.set('foodHidden', [...new Set([...hidden, h.dataset.foodhide])]); toast(`${h.dataset.foodhide} ausgeblendet`); rerender(); }
+    if (e.target.closest('#foodUnhide')) { store.set('foodHidden', []); rerender(); }
+  });
 }
 
 /* ---------- Thai-Sprachführer ---------- */
