@@ -1357,6 +1357,7 @@ function renderFood(main) {
   const card = r => `<div class="card">
       <b>${esc(r.name)}</b>
       <div><span class="badge ${/Michelin/.test(r.badge) ? 'ok' : ''}">${esc(r.badge)}</span></div>
+      ${r.dist ? `<div class="small"><b>🚶 ${esc(r.dist)}</b></div>` : ''}
       <div class="small muted">${esc(r.type)} · ${esc(r.area)} · ${esc(r.price)}${r.hours ? ' · ' + esc(r.hours) : ''}</div>
       <div style="margin-top:6px">${esc(r.dishes)}</div>
       <div class="small">🧒 ${esc(r.kids)}</div>
@@ -1364,7 +1365,7 @@ function renderFood(main) {
       <div class="btns"><a class="btn small" href="${mapsUrl(r.maps)}" target="_blank" rel="noopener">📍 Karte & Bewertungen</a>
         <a class="btn small ghost" href="${photosUrl(r.maps)}" target="_blank" rel="noopener">📷 Fotos</a>
         <button class="btn small ghost" data-foodhide="${esc(r.name)}">👎 Ausblenden</button></div></div>`;
-  main.innerHTML = `<div class="card small">Ausgewählt nach Michelin Guide und gut bewerteten Häusern, nur mit Sitzplätzen oder gut zum Mitnehmen. Bewertungen ändern sich – vor dem Besuch kurz in Google Maps reinschauen.</div>
+  main.innerHTML = `<div class="card small">Ausgewählt nach Michelin Guide und gut bewerteten Häusern, in Laufweite eurer Unterkünfte, nur mit Sitzplätzen. Bewertungen ändern sich – vor dem Besuch kurz in Google Maps reinschauen.</div>
     <div class="btns pad"><a class="btn" href="${mapsUrl('Restaurant')}" target="_blank" rel="noopener">🍽️ Restaurants in der Nähe</a></div>
     ${order.map(pl => `<h2>${esc(trip.places[pl].name)}${pl === here ? ' (ihr seid hier)' : ''}</h2>${shown.filter(r => r.place === pl).map(card).join('')}`).join('')}
     ${hidden.length ? `<p class="pad small muted">${hidden.length} ausgeblendet · <button class="linkbtn" id="foodUnhide">wieder zeigen</button></p>` : ''}
