@@ -1733,6 +1733,31 @@ async function diaryRemote(c, pass) {
   const box = JSON.parse(atob(f.content.replace(/\s/g, '')));
   return { index: await TripShared.decryptJson(box, pass), sha: f.sha };
 }
+// Fotos ohne Aufnahmezeit ans Ende
+const byTaken = (a, b) => (!a.taken) - (!b.taken) || (a.taken || '').localeCompare(b.taken || '');
+/* Aufnahmezeit aus den EXIF-Daten lesen, bevor das Verkleinern sie entfernt (Kamerazeit = Ortszeit am Handy) */
+async function photoTakenAt(file) {
+  try {
+    const v = new DataView(await file.slice(0, 256 * 1024).arrayBuffer());
+    if (v.getUint16(0) !== 0xFFD8) return null;
+    for (let o = 2; o + 4 < v.byteLength;) {
+      const marker = v.getUint16(o), len = v.getUint16(o + 2);
+      if (marker === 0xFFE1 && v.getUint32(o + 4) === 0x45786966) {
+        const t = o + 10, le = v.getUint16(t) === 0x4949;
+        const u16 = x => v.getUint16(t + x, le), u32 = x => v.getUint32(t + x, le);
+        const tag = (ifd, id) => { for (let i = 0, n = u16(ifd); i < n; i++) { const e = ifd + 2 + i * 12; if (u16(e) === id) return e; } return null; };
+        const ex = tag(u32(4), 0x8769); if (ex == null) return null;
+        const d = tag(u32(ex + 8), 0x9003) ?? tag(u32(ex + 8), 0x9004); if (d == null) return null;
+        const str = String.fromCharCode(...new Uint8Array(v.buffer, t + u32(d + 8), 19));
+        const m = /^(\d{4}):(\d\d):(\d\d) (\d\d):(\d\d)/.exec(str);
+        return m ? `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}` : null;
+      }
+      if ((marker & 0xFF00) !== 0xFF00) break;
+      o += 2 + len;
+    }
+  } catch {}
+  return null;
+}
 async function shrinkPhoto(file, max = 1600) {
   let src;
   try { src = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
@@ -1753,13 +1778,15 @@ async function addDiaryEntry({ date, caption, files }, progress) {
   const photos = [];
   for (const [i, f] of files.entries()) {
     progress(`Foto ${i + 1} von ${files.length} wird verkleinert und hochgeladen …`);
+    const taken = await photoTakenAt(f);
     const { blob, w, h } = await shrinkPhoto(f);
     const enc = await TripShared.encryptBytes(key, new Uint8Array(await blob.arrayBuffer()));
     const path = `data/fotos/${uid()}.bin`;
     await ghPutB64(c.ghRepo, c.ghToken, path, TripShared.b64(enc), 'Foto hinzugefügt', null);
     photoUrls[path] = URL.createObjectURL(blob);
-    photos.push({ f: path, w, h });
+    photos.push({ f: path, w, h, taken });
   }
+  photos.sort(byTaken);
   const entry = { id: uid(), date, caption, photos, ts: Date.now() };
   progress('Tagebuch wird gespeichert …');
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -1901,11 +1928,13 @@ async function renderDiary(main) {
   }
   const [index, acc] = await Promise.all([loadDiary(), writeAccess()]);
   const comments = await loadComments(acc);
-  const list = [...(index.entries || [])].sort((x, y) => (y.date + y.ts).localeCompare(x.date + x.ts));
+  // neuester Tag oben; am selben Tag nach Aufnahmezeit des ersten Fotos (sonst Zeit des Hochladens)
+  const firstShot = en => en.photos.map(p => p.taken).filter(Boolean).sort()[0] || new Date(en.ts).toISOString();
+  const list = [...(index.entries || [])].sort((x, y) => y.date.localeCompare(x.date) || firstShot(y).localeCompare(firstShot(x)));
   $('#entries', main).innerHTML = list.length ? list.map(en => `<div class="card">
       <div class="row between"><b>${dayLabel(en.date, true)}</b>${canPost ? `<button class="btn small danger" data-deldiary="${en.id}">Löschen</button>` : ''}</div>
       ${en.caption ? `<p style="white-space:pre-wrap;margin:8px 0">${esc(en.caption)}</p>` : ''}
-      ${en.photos.length ? `<div class="photogrid">${en.photos.map(ph => `<img data-photo="${esc(ph.f)}" alt="Urlaubsfoto" width="${ph.w}" height="${ph.h}">`).join('')}</div>` : ''}
+      ${en.photos.length ? `<div class="photogrid">${[...en.photos].sort(byTaken).map(ph => `<figure><img data-photo="${esc(ph.f)}" alt="Urlaubsfoto" width="${ph.w}" height="${ph.h}">${ph.taken ? `<figcaption>${ph.taken.slice(8, 10)}.${ph.taken.slice(5, 7)}. ${ph.taken.slice(11, 16)}</figcaption>` : ''}</figure>`).join('')}</div>` : ''}
       ${commentsHtml(en.id, comments, !!acc)}
     </div>`).join('') : `<div class="card"><p>Noch keine Einträge.</p><p class="small muted">${isGuest() ? 'Schaut abends wieder vorbei.' : 'Abends ein paar Fotos und zwei Sätze – fertig.'}</p></div>`;
   $$('img[data-photo]', main).forEach(img => showPhoto(img, img.dataset.photo, index.photoKey));

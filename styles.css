@@ -540,3 +540,5 @@ details.day .body .uvline { margin: -6px 0 12px; }
 .cmt { background: var(--chip); border-radius: 14px; padding: 8px 12px; }
 .cmt .linkbtn { min-height: 0; padding: 0 0 0 6px; }
 .cmtform select { min-height: 40px; }
+.photogrid figure { margin: 0; position: relative; }
+.photogrid figcaption { position: absolute; left: 6px; bottom: 6px; padding: 2px 7px; border-radius: 999px; background: rgba(0, 0, 0, .55); color: #fff; font-size: .72rem; font-weight: 600; pointer-events: none; }
