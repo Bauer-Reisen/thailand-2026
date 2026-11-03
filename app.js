@@ -13,7 +13,7 @@ const CLAUDE_MODEL = 'claude-opus-5-5';
 
 let trip = null;
 const isGuest = () => trip?.role === 'gast';
-const FILES = { familie: 'data/familie.enc.json', gast: 'data/gaeste.enc.json', diary: 'data/tagebuch.enc.json' };
+const FILES = { familie: 'data/familie.enc.json', gast: 'data/gaeste.enc.json', diary: 'data/tagebuch.enc.json', comments: 'data/kommentare.enc.json', guestKey: 'data/schreibzugang.enc.json' };
 const GUEST_ROUTES = ['heute', 'plan', 'tagebuch', 'fluege', 'woerter', 'mehr'];
 
 /* Thai-Wörter, die in Orts- und Programmnamen ständig vorkommen */
@@ -1537,7 +1537,32 @@ function renderGuests(main) {
     <p class="small">Nicht sichtbar für Gäste: Unterkünfte, Adressen, Gastgeber, Ausgaben, Listen, Dokumente, Codes.</p>
     <dl class="kv"><dt>Link</dt><dd style="word-break:break-all">${esc(link)}</dd><dt>Passwort</dt><dd class="code">${esc(pass)}</dd></dl>
     <div class="btns"><button class="btn" data-copy="${esc(msg)}">Nachricht kopieren</button></div></div>
-    <div class="card small">Passwort ändern: unter <a href="#/bearbeiten">Reisedaten bearbeiten</a> den Wert bei <code>viewerPass</code> ändern und veröffentlichen. Danach kommen alte Gäste nicht mehr rein.</div>`;
+    <div class="card"><b>💬 Kommentare im Tagebuch</b>
+      <p class="small">Damit Gäste kommentieren können, wird euer GitHub-Schlüssel aus „Meine Codes“ verschlüsselt mit dem Gäste-Passwort abgelegt. Wer das Gäste-Passwort kennt, kann damit ins Repository schreiben. Läuft der Schlüssel ab, hier einfach neu freischalten.</p>
+      <p class="small muted" id="cmtState">Prüfe …</p>
+      <div class="btns"><button class="btn" id="cmtOn">Für Gäste freischalten</button><button class="btn ghost" id="cmtOff">Sperren</button></div></div>
+    <div class="card small">Passwort ändern: unter <a href="#/bearbeiten">Reisedaten bearbeiten</a> den Wert bei <code>viewerPass</code> ändern und veröffentlichen. Danach kommen alte Gäste nicht mehr rein. Danach Kommentare hier neu freischalten.</div>`;
+  const c = store.get('codes', {});
+  const state = async () => {
+    if (!c.ghRepo || !c.ghToken) { $('#cmtState').innerHTML = 'Erst unter <a href="#/codes">Meine Codes</a> Repository und Schlüssel eintragen.'; return; }
+    try { $('#cmtState').textContent = (await ghGet(c.ghRepo, c.ghToken, FILES.guestKey)) ? '✓ Gäste können kommentieren.' : 'Gäste können noch nicht kommentieren.'; }
+    catch (err) { $('#cmtState').textContent = 'Status nicht abrufbar: ' + err.message; }
+  };
+  state();
+  $('#cmtOn').addEventListener('click', async e => {
+    if (!c.ghRepo || !c.ghToken) return toast('Erst Schlüssel unter Meine Codes eintragen');
+    const btn = e.currentTarget; btn.disabled = true;
+    try {
+      const enc = await TripShared.encryptJson({ repo: c.ghRepo, token: c.ghToken }, pass);
+      await ghPutB64(c.ghRepo, c.ghToken, FILES.guestKey, TripShared.b64(new TextEncoder().encode(JSON.stringify(enc))), 'Kommentare für Gäste freigeschaltet');
+      toast('Freigeschaltet'); state();
+    } catch (err) { toast('Fehlgeschlagen: ' + err.message); }
+    btn.disabled = false;
+  });
+  $('#cmtOff').addEventListener('click', async e => {
+    if (!confirmTap(e.currentTarget, 'Nochmal tippen zum Sperren')) return;
+    try { await ghDelete(c.ghRepo, c.ghToken, FILES.guestKey); toast('Gesperrt'); state(); } catch (err) { toast('Fehlgeschlagen: ' + err.message); }
+  });
 }
 
 /* ---------- Reisedaten bearbeiten: verschlüsseln und veröffentlichen ---------- */
@@ -1769,6 +1794,84 @@ async function showPhoto(img, path, keyB64) {
     img.src = photoUrls[path];
   } catch { img.alt = 'Foto noch nicht da – in 1–2 Minuten erneut öffnen'; img.classList.add('missing'); }
 }
+/* ---------- Kommentare zu Tagebuch-Einträgen ----------
+   Alle Kommentare liegen in data/kommentare.enc.json, verschlüsselt mit dem Gäste-Passwort.
+   Gäste schreiben mit einem Schreibschlüssel, den ein Familienhandy unter Gäste-Zugang freigibt
+   (data/schreibzugang.enc.json, ebenfalls mit dem Gäste-Passwort verschlüsselt). */
+async function writeAccess() {
+  const c = store.get('codes', {});
+  if (!isGuest()) return c.ghRepo && c.ghToken ? { repo: c.ghRepo, token: c.ghToken } : null;
+  try {
+    const r = await fetch(FILES.guestKey, { cache: 'no-cache' });
+    if (!r.ok) return null;
+    return await TripShared.decryptJson(await r.json(), diaryPass());
+  } catch { return null; }
+}
+async function commentsRemote(acc) {
+  const f = await ghGet(acc.repo, acc.token, FILES.comments);
+  if (!f) return { list: [], sha: null };
+  const box = JSON.parse(atob(f.content.replace(/\s/g, '')));
+  return { list: (await TripShared.decryptJson(box, diaryPass())).list || [], sha: f.sha };
+}
+async function loadComments(acc) {
+  try {
+    if (acc) { const { list } = await commentsRemote(acc); store.set('commentCache', list); return list; }
+    const r = await fetch(FILES.comments, { cache: 'no-cache' });
+    if (!r.ok) return store.get('commentCache', []);
+    const list = (await TripShared.decryptJson(await r.json(), diaryPass())).list || [];
+    store.set('commentCache', list); return list;
+  } catch { return store.get('commentCache', []); }
+}
+// gleiches Muster wie beim Tagebuch: bei gleichzeitigem Schreiben neu laden und nochmal versuchen
+async function changeComments(acc, fn, msg) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { list, sha } = await commentsRemote(acc);
+    const next = fn(list);
+    try {
+      const enc = await TripShared.encryptJson({ list: next }, diaryPass());
+      await ghPutB64(acc.repo, acc.token, FILES.comments, TripShared.b64(new TextEncoder().encode(JSON.stringify(enc))), msg, sha);
+      store.set('commentCache', next); return next;
+    } catch (e) { if (e.status !== 409 && e.status !== 422) throw e; }
+  }
+  throw new Error('Kommentar konnte nicht gespeichert werden');
+}
+function commentersList() { return trip.meta.commenters || []; }
+function commentsHtml(entryId, list, canWrite) {
+  const mine = store.get('myComments', []);
+  const items = list.filter(c => c.entry === entryId).sort((a, b) => a.ts - b.ts);
+  const me = store.get('commentAs', '');
+  return `<div class="comments" data-entry="${entryId}">
+    ${items.map(c => `<div class="cmt"><b>${esc(c.who)}</b> <span class="small muted">${new Date(c.ts).toLocaleString('de-DE', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: BANGKOK })}</span>
+      ${!isGuest() || mine.includes(c.id) ? `<button class="linkbtn small" data-delcmt="${c.id}">löschen</button>` : ''}
+      <div style="white-space:pre-wrap">${esc(c.text)}</div></div>`).join('')}
+    ${canWrite ? `<form class="cmtform"><div class="row" style="gap:8px;flex-wrap:wrap">
+        <select name="who" aria-label="Ich bin" required><option value="">Ich bin …</option>${commentersList().map(n => `<option ${n === me ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+      <div class="row" style="gap:8px;margin-top:6px"><input class="grow" name="text" placeholder="Kommentar schreiben …" maxlength="500" autocomplete="off"><button class="btn small" type="submit">Senden</button></div></form>`
+      : `<p class="small muted">${isGuest() ? 'Kommentieren ist gerade nicht freigeschaltet.' : 'Zum Kommentieren unter Meine Codes den GitHub-Schlüssel eintragen.'}</p>`}
+  </div>`;
+}
+function bindComments(main, acc, rerenderComments) {
+  main.addEventListener('submit', async e => {
+    const f = e.target.closest('.cmtform'); if (!f) return;
+    e.preventDefault();
+    const who = f.who.value, text = f.text.value.trim(), entry = f.closest('.comments').dataset.entry;
+    if (!who) return toast('Bitte erst auswählen, wer schreibt');
+    if (!text) return;
+    store.set('commentAs', who);
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    const c = { id: uid(), entry, who, text, ts: Date.now() };
+    try {
+      const list = await changeComments(acc, l => [...l, c], `Kommentar von ${who}`);
+      store.set('myComments', [...store.get('myComments', []), c.id]);
+      rerenderComments(list);
+    } catch (err) { toast('Senden fehlgeschlagen: ' + err.message); btn.disabled = false; }
+  });
+  main.addEventListener('click', async e => {
+    const d = e.target.closest('[data-delcmt]'); if (!d || !confirmTap(d, 'Wirklich?')) return;
+    try { rerenderComments(await changeComments(acc, l => l.filter(c => c.id !== d.dataset.delcmt), 'Kommentar gelöscht')); }
+    catch (err) { toast('Löschen fehlgeschlagen: ' + err.message); }
+  });
+}
 async function renderDiary(main) {
   const c = store.get('codes', {});
   const canPost = !isGuest() && c.ghRepo && c.ghToken;
@@ -1796,14 +1899,17 @@ async function renderDiary(main) {
       catch (err) { $('#dMsg').textContent = 'Fehlgeschlagen: ' + err.message; btn.disabled = false; }
     });
   }
-  const index = await loadDiary();
+  const [index, acc] = await Promise.all([loadDiary(), writeAccess()]);
+  const comments = await loadComments(acc);
   const list = [...(index.entries || [])].sort((x, y) => (y.date + y.ts).localeCompare(x.date + x.ts));
   $('#entries', main).innerHTML = list.length ? list.map(en => `<div class="card">
       <div class="row between"><b>${dayLabel(en.date, true)}</b>${canPost ? `<button class="btn small danger" data-deldiary="${en.id}">Löschen</button>` : ''}</div>
       ${en.caption ? `<p style="white-space:pre-wrap;margin:8px 0">${esc(en.caption)}</p>` : ''}
       ${en.photos.length ? `<div class="photogrid">${en.photos.map(ph => `<img data-photo="${esc(ph.f)}" alt="Urlaubsfoto" width="${ph.w}" height="${ph.h}">`).join('')}</div>` : ''}
+      ${commentsHtml(en.id, comments, !!acc)}
     </div>`).join('') : `<div class="card"><p>Noch keine Einträge.</p><p class="small muted">${isGuest() ? 'Schaut abends wieder vorbei.' : 'Abends ein paar Fotos und zwei Sätze – fertig.'}</p></div>`;
   $$('img[data-photo]', main).forEach(img => showPhoto(img, img.dataset.photo, index.photoKey));
+  if (acc) bindComments(main, acc, all => $$('.comments', main).forEach(box => { box.outerHTML = commentsHtml(box.dataset.entry, all, true); }));
   main.addEventListener('click', async e => {
     const img = e.target.closest('img[data-photo]');
     if (img?.src) {

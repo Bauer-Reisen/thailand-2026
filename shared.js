@@ -48,7 +48,7 @@
     const cleanPlan = p => ({ type: p.type, title: scrub(p.title), items: p.items.map(cleanItem) });
     return {
       role: 'gast',
-      meta: { title: trip.meta.title, subtitle: trip.meta.subtitle, start: trip.meta.start, end: trip.meta.end, travelers: trip.meta.travelers, stand: trip.meta.stand },
+      meta: { title: trip.meta.title, subtitle: trip.meta.subtitle, start: trip.meta.start, end: trip.meta.end, travelers: trip.meta.travelers, stand: trip.meta.stand, commenters: trip.meta.commenters || [] },
       places: trip.places,
       flights: trip.flights.map(f => ({ id: f.id, number: f.number, airline: f.airline, class: f.class, from: f.from, to: f.to, dep: f.dep, arr: f.arr, depDisplay: f.depDisplay, arrDisplay: f.arrDisplay })),
       days: trip.days.map(d => ({ date: d.date, place: d.place, title: scrub(d.title), planA: cleanPlan(d.planA), planB: (d.planB || []).map(cleanPlan) }))

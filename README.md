@@ -42,6 +42,9 @@ Ausgaben → „🏧 Geld abheben“: abgehobene Baht und ATM-Gebühr eintragen,
 ## Tagebuch für Familie & Gäste
 Mehr → Tagebuch (Gäste: eigener Tab). Text schreiben, Fotos wählen, „veröffentlichen“. Fotos werden auf 1600 px verkleinert, Ortsdaten entfernt und mit dem Gäste-Passwort verschlüsselt in `data/` hochgeladen. Braucht auf dem Handy GitHub-Repository und -Schlüssel unter „Meine Codes“. Gäste sehen neue Einträge nach 1–2 Minuten.
 
+## Kommentare
+Unter jedem Tagebuch-Eintrag können Familie und Gäste kommentieren: erst „Ich bin …“ wählen, dann schreiben. Die Namensliste steht in den Reisedaten unter `meta.commenters`. Für Gäste einmal unter Mehr → Gäste-Zugang „Für Gäste freischalten“ tippen: Dabei wird der GitHub-Schlüssel aus „Meine Codes“ mit dem Gäste-Passwort verschlüsselt abgelegt (`data/schreibzugang.enc.json`). Wer das Gäste-Passwort kennt, kann damit ins Repository schreiben. „Sperren“ löscht die Datei. Kommentare liegen verschlüsselt in `data/kommentare.enc.json`.
+
 ## Lernen
 Mehr → Lernen: Karteikarten je Kind und Reisetag (Vokabel, Lückentext, Satz bauen, Verstehen, Rechnen), danach Sachaufgabe, Nachdenk-Frage und Sprech-Aufgabe. Neue Inhalte im selben Markdown-Format: in der App „Datei laden“ (nur dieses Handy) oder dauerhaft mit `node tools/import-learn.js trip.json lerninhalte.md` und danach `tools/encrypt.js`.
 

@@ -534,3 +534,9 @@ body.noscroll #toast { bottom: auto; top: calc(12px + env(safe-area-inset-top));
 .uvline { margin: 2px 16px 8px; color: var(--sand-muted); }
 .uvline b { color: var(--sand-ink); }
 details.day .body .uvline { margin: -6px 0 12px; }
+/* Kommentare im Tagebuch */
+.comments { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+.comments::before { content: "💬 Kommentare"; font-size: .8rem; font-weight: 700; color: var(--muted); }
+.cmt { background: var(--chip); border-radius: 14px; padding: 8px 12px; }
+.cmt .linkbtn { min-height: 0; padding: 0 0 0 6px; }
+.cmtform select { min-height: 40px; }
