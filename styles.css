@@ -529,3 +529,8 @@ body.noscroll #toast { bottom: auto; top: calc(12px + env(safe-area-inset-top));
   :root:not([data-theme="light"]).ownbg body::before { background: #0b0e1a var(--bgimg) center / cover no-repeat; }
   :root:not([data-theme="light"]).ownbg body::after { display: block; background: linear-gradient(180deg, rgba(5, 8, 18, .45), rgba(5, 8, 18, .75) 45%, rgba(5, 8, 18, .9)); }
 }
+/* UV-Anzeige */
+.uv { display: inline-block; margin-top: 3px; padding: 1px 7px; border-radius: 999px; font-size: .7rem; font-weight: 700; color: #fff; background: var(--uv); }
+.uvline { margin: 2px 16px 8px; color: var(--sand-muted); }
+.uvline b { color: var(--sand-ink); }
+details.day .body .uvline { margin: -6px 0 12px; }

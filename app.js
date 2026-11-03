@@ -203,6 +203,21 @@ function weatherFor(placeId, date) {
 }
 /* Tagesverlauf: morgens, mittags, nachmittags, abends – damit man sieht, wann es regnet und dass der Rest gut ist */
 const DAY_PARTS = [['Morgens', 7, 11], ['Mittags', 11, 14], ['Nachmittags', 14, 18], ['Abends', 18, 22]];
+/* UV-Stufen nach WHO (Global Solar UV Index): ab 3 Sonnenschutz, ab 8 mittags in den Schatten */
+const UV_LEVELS = [[11, 'extrem', '#7b2cbf'], [8, 'sehr hoch', '#d62828'], [6, 'hoch', '#f77f00'], [3, 'mäßig', '#e0a800'], [0, 'niedrig', '#2a9d8f']];
+const uvLevel = v => UV_LEVELS.find(([min]) => Math.round(v) >= min) || UV_LEVELS[UV_LEVELS.length - 1];
+const uvChip = v => { const [, label, color] = uvLevel(v); return `<span class="uv" style="--uv:${color}" title="UV ${label}">UV ${Math.round(v)}</span>`; };
+// Wann am Tag die Sonne gefährlich ist: Zeitraum mit UV ≥ 3 und ≥ 8
+function uvLine(placeId, date) {
+  const h = store.get('wx', {})[placeId]?.hourly;
+  if (!h?.uv_index) return '';
+  const idx = h.time.map((t, k) => [t, k]).filter(([t]) => t.startsWith(date)).map(([, k]) => k);
+  const uv = idx.map(k => h.uv_index[k] ?? 0);
+  if (!uv.length) return '';
+  const max = Math.max(...uv), span = min => { const on = idx.filter((k, i) => uv[i] >= min); return on.length ? `${+h.time[on[0]].slice(11, 13)}–${+h.time[on[on.length - 1]].slice(11, 13) + 1} Uhr` : ''; };
+  const [, label] = uvLevel(max);
+  return `<div class="uvline small">${uvChip(max)} <b>${label}</b>${span(3) ? ` · Sonnenschutz ${span(3)}` : ''}${span(8) ? ` · mittags Schatten ${span(8)}` : ''}</div>`;
+}
 function wxParts(placeId, date) {
   const h = store.get('wx', {})[placeId]?.hourly;
   if (!h?.temperature_2m) return '';
@@ -214,10 +229,11 @@ function wxParts(placeId, date) {
     const look = wet.length ? wmo(Math.max(...wet.map(k => h.weather_code[k]))) : wmo(codes[Math.floor(codes.length / 2)]);
     const night = from >= 18 && !wet.length && look.icon === '☀️' ? '🌙' : look.icon;
     const temp = Math.round(Math.max(...idx.map(k => h.temperature_2m[k])));
+    const uv = h.uv_index ? Math.max(...idx.map(k => h.uv_index[k] ?? 0)) : null;
     return `<div><span class="pl">${label}</span><span class="pi">${night}</span><b>${temp}°</b>
-      <span class="pr">${wet.length ? `${wet.length === idx.length ? 'Regen' : `${wet.length} Std. Regen`}` : 'trocken'}</span></div>`;
+      <span class="pr">${wet.length ? `${wet.length === idx.length ? 'Regen' : `${wet.length} Std. Regen`}` : 'trocken'}</span>${uv != null && uv >= 1 ? uvChip(uv) : ''}</div>`;
   }).join('');
-  return cells ? `<div class="dayparts">${cells}</div>` : '';
+  return cells ? `<div class="dayparts">${cells}</div>${uvLine(placeId, date)}` : '';
 }
 // Symbol und Text für den Tag: kurze Schauer werden als solche benannt, nicht als Regentag
 function wxLook(w) {
@@ -233,14 +249,14 @@ function sunScore(w) {
 async function loadWeather(force = false) {
   const cache = store.get('wx', {});
   const ids = ['bkk', 'samet'];
-  const stale = ids.some(id => !cache[id] || !cache[id].hourly?.temperature_2m || Date.now() - cache[id].ts > 3 * 3600000);
+  const stale = ids.some(id => !cache[id] || !cache[id].hourly?.uv_index || Date.now() - cache[id].ts > 3 * 3600000);
   if (!navigator.onLine || (!stale && !force)) return false;
   let changed = false;
   await Promise.all(ids.map(async id => {
     const p = trip.places[id];
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}` +
       '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max,sunset' +
-      '&hourly=weather_code,precipitation,precipitation_probability,temperature_2m' +
+      '&hourly=weather_code,precipitation,precipitation_probability,temperature_2m,uv_index' +
       `&timezone=${encodeURIComponent(p.tz)}&forecast_days=16`;
     try {
       const r = await fetch(url);
@@ -599,7 +615,7 @@ function renderToday(main) {
     <div class="eyebrow">${dt.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })} · ${esc(trip.places[day.place].name)}</div>
     <h1>${esc(sourceDay(t.date).title)}</h1>
     <div class="pills">${w ? `<span class="glass">${look.icon} <b>${Math.round(w.tmax)}°</b> ${esc(look.text)}</span>` : ''}
-      <span class="glass">🕐 ${fmtMin(nowMin)} · ${other[0]} ${fmtMin(other[1].min)}</span>${w?.sunset ? `<span class="glass">🌅 ${w.sunset}</span>` : ''}</div></header>`;
+      <span class="glass">🕐 ${fmtMin(nowMin)} · ${other[0]} ${fmtMin(other[1].min)}</span>${w?.uv != null ? `<span class="glass">☀️ UV ${Math.round(w.uv)} ${uvLevel(w.uv)[1]}</span>` : ''}${w?.sunset ? `<span class="glass">🌅 ${w.sunset}</span>` : ''}</div></header>`;
   html += '<div class="sheetpage">';
   if (!isGuest()) html += reminderCards(true) + checkinCards(true);
 
