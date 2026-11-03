@@ -1915,7 +1915,17 @@ async function renderDiary(main) {
     : `<div class="card small">Zum Hochladen auf diesem Handy unter <a href="#/codes">Meine Codes</a> GitHub-Repository und -Schlüssel eintragen.</div>`}
     <div id="entries"><p class="pad muted"><span class="spinner"></span> Lädt …</p></div>`;
   if (canPost) {
-    $('#dFiles').addEventListener('change', e => ($('#dCount').textContent = `${e.target.files.length} Foto(s) gewählt – werden auf 1600 px verkleinert, Ortsdaten entfernt`));
+    // Datum aus den Fotos übernehmen, solange es niemand von Hand geändert hat
+    let dateTouched = false;
+    $('#dDate').addEventListener('input', () => (dateTouched = true));
+    $('#dFiles').addEventListener('change', async e => {
+      const files = [...e.target.files];
+      $('#dCount').textContent = `${files.length} Foto(s) gewählt – werden auf 1600 px verkleinert, Ortsdaten entfernt`;
+      const days = [...new Set((await Promise.all(files.map(photoTakenAt))).filter(Boolean).map(t => t.slice(0, 10)))].sort();
+      if (!days.length || dateTouched) return;
+      $('#dDate').value = days[0];
+      $('#dCount').textContent += days.length > 1 ? ` · Fotos vom ${days.map(d => dayLabel(d)).join(', ')} – Datum auf den ersten Tag gesetzt` : ` · Datum aus den Fotos: ${dayLabel(days[0])}`;
+    });
     $('#diaryForm').addEventListener('submit', async e => {
       e.preventDefault();
       const files = [...$('#dFiles').files], caption = $('#dText').value.trim();
