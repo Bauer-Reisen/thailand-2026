@@ -542,3 +542,8 @@ details.day .body .uvline { margin: -6px 0 12px; }
 .cmtform select { min-height: 40px; }
 .photogrid figure { margin: 0; position: relative; }
 .photogrid figcaption { position: absolute; left: 6px; bottom: 6px; padding: 2px 7px; border-radius: 999px; background: rgba(0, 0, 0, .55); color: #fff; font-size: .72rem; font-weight: 600; pointer-events: none; }
+.pickgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; margin-top: 8px; }
+.pickgrid:empty { display: none; }
+.pickgrid > div { position: relative; }
+.pickgrid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; }
+.pickgrid button { position: absolute; top: 3px; right: 3px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, .65); color: #fff; font-size: 1rem; line-height: 1; cursor: pointer; }

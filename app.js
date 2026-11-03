@@ -1909,6 +1909,7 @@ async function renderDiary(main) {
         <label class="field"><span>Was war heute?</span><textarea id="dText" placeholder="z. B. Erster Tag am Strand, Krabben gefangen …"></textarea></label>
         <label class="btn ghost block">📷 Fotos auswählen<input type="file" id="dFiles" accept="image/*" multiple hidden></label>
         <div class="small muted" id="dCount" style="margin-top:6px">Keine Fotos gewählt</div>
+        <div class="pickgrid" id="dPick"></div>
         <button class="btn block" type="submit" style="margin-top:10px">Für Familie & Gäste veröffentlichen</button>
         <p class="small" id="dMsg" role="status"></p>
       </form></div>`
@@ -1918,9 +1919,18 @@ async function renderDiary(main) {
     // Datum aus den Fotos übernehmen, solange es niemand von Hand geändert hat
     let dateTouched = false;
     $('#dDate').addEventListener('input', () => (dateTouched = true));
+    // gewählte Fotos als Vorschau, jedes mit × wieder herausnehmbar
+    let picked = [];
+    const showPicked = () => {
+      $('#dPick').innerHTML = picked.map((f, i) => `<div><img src="${URL.createObjectURL(f)}" alt=""><button type="button" data-unpick="${i}" aria-label="Foto entfernen">×</button></div>`).join('');
+      $('#dCount').textContent = picked.length ? `${picked.length} Foto(s) gewählt – werden auf 1600 px verkleinert, Ortsdaten entfernt` : 'Keine Fotos gewählt';
+    };
+    $('#dPick').addEventListener('click', e => { const b = e.target.closest('[data-unpick]'); if (b) { picked.splice(+b.dataset.unpick, 1); showPicked(); } });
     $('#dFiles').addEventListener('change', async e => {
-      const files = [...e.target.files];
-      $('#dCount').textContent = `${files.length} Foto(s) gewählt – werden auf 1600 px verkleinert, Ortsdaten entfernt`;
+      // erneutes Auswählen ergänzt die Auswahl statt sie zu ersetzen
+      picked = [...picked, ...e.target.files]; e.target.value = '';
+      const files = picked;
+      showPicked();
       const days = [...new Set((await Promise.all(files.map(photoTakenAt))).filter(Boolean).map(t => t.slice(0, 10)))].sort();
       if (!days.length || dateTouched) return;
       $('#dDate').value = days[0];
@@ -1928,7 +1938,7 @@ async function renderDiary(main) {
     });
     $('#diaryForm').addEventListener('submit', async e => {
       e.preventDefault();
-      const files = [...$('#dFiles').files], caption = $('#dText').value.trim();
+      const files = [...picked], caption = $('#dText').value.trim();
       if (!files.length && !caption) { $('#dMsg').textContent = 'Text oder Fotos hinzufügen.'; return; }
       const btn = e.submitter; btn.disabled = true;
       const msg = s => ($('#dMsg').innerHTML = `<span class="spinner"></span> ${esc(s)}`);
