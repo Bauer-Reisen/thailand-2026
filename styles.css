@@ -547,3 +547,4 @@ details.day .body .uvline { margin: -6px 0 12px; }
 .pickgrid > div { position: relative; }
 .pickgrid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; }
 .pickgrid button { position: absolute; top: 3px; right: 3px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, .65); color: #fff; font-size: 1rem; line-height: 1; cursor: pointer; }
+.daytag { display: inline-block; padding: 3px 10px; border-radius: 999px; font-weight: 700; font-size: .9rem; background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--brand); }

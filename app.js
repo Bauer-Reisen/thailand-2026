@@ -1948,11 +1948,14 @@ async function renderDiary(main) {
   }
   const [index, acc] = await Promise.all([loadDiary(), writeAccess()]);
   const comments = await loadComments(acc);
-  // neuester Tag oben; am selben Tag nach Aufnahmezeit des ersten Fotos (sonst Zeit des Hochladens)
-  const firstShot = en => en.photos.map(p => p.taken).filter(Boolean).sort()[0] || new Date(en.ts).toISOString();
-  const list = [...(index.entries || [])].sort((x, y) => y.date.localeCompare(x.date) || firstShot(y).localeCompare(firstShot(x)));
+  // wie ein Verlauf: zuletzt Hochgeladenes oben, damit Gäste Neues sofort sehen; der Reisetag steht als Etikett dran
+  const list = [...(index.entries || [])].sort((x, y) => y.ts - x.ts);
+  const seen = store.get('diarySeen', 0);
+  store.set('diarySeen', Date.now());
+  const posted = ts => new Date(ts).toLocaleString('de-DE', { weekday: 'short', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: BANGKOK });
   $('#entries', main).innerHTML = list.length ? list.map(en => `<div class="card">
-      <div class="row between"><b>${dayLabel(en.date, true)}</b>${canPost ? `<button class="btn small danger" data-deldiary="${en.id}">Löschen</button>` : ''}</div>
+      <div class="row between"><span><span class="daytag">📅 ${dayLabel(en.date, true)}</span>${seen && en.ts > seen ? ' <span class="badge open">neu</span>' : ''}
+        <span class="small muted" style="display:block;margin-top:4px">gepostet ${posted(en.ts)}</span></span>${canPost ? `<button class="btn small danger" data-deldiary="${en.id}">Löschen</button>` : ''}</div>
       ${en.caption ? `<p style="white-space:pre-wrap;margin:8px 0">${esc(en.caption)}</p>` : ''}
       ${en.photos.length ? `<div class="photogrid">${[...en.photos].sort(byTaken).map(ph => `<figure><img data-photo="${esc(ph.f)}" alt="Urlaubsfoto" width="${ph.w}" height="${ph.h}">${ph.taken ? `<figcaption>${ph.taken.slice(8, 10)}.${ph.taken.slice(5, 7)}. ${ph.taken.slice(11, 16)}</figcaption>` : ''}</figure>`).join('')}</div>` : ''}
       ${commentsHtml(en.id, comments, !!acc)}
