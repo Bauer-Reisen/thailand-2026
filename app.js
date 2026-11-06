@@ -319,7 +319,8 @@ function feeEntries() {
   return [...atm, ...card];
 }
 function allSpending() {
-  const pre = (trip.meta.prepaid || []).map(p => ({ ...p, amount: p.amountEUR, currency: 'EUR', prepaid: true, note: p.label }));
+  // Vorab-Posten in Euro oder in Baht (amountTHB, umgerechnet mit dem Referenzkurs)
+  const pre = (trip.meta.prepaid || []).map(p => ({ ...p, amount: p.amountTHB ?? p.amountEUR, currency: p.amountTHB != null ? 'THB' : 'EUR', prepaid: true, note: p.label }));
   return [...pre, ...expenses(), ...feeEntries()];
 }
 function spentOn(date) { return allSpending().filter(e => !e.prepaid && e.date === date).reduce((s, e) => s + toEur(e), 0); }
